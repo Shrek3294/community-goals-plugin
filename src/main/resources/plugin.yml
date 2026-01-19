@@ -1,0 +1,34 @@
+name: CommunityGoals
+version: 1.0.0
+main: com.community.goals.CommunityGoalsPlugin
+api-version: 1.21
+description: A plugin for managing community goals with world border expansion
+authors:
+  - Community
+
+commands:
+  goal:
+    description: Main goal command
+    usage: /goal <subcommand>
+    permission: goal.use
+    
+  goal-admin:
+    description: Admin goal commands
+    usage: /goal-admin <subcommand>
+    permission: goal.admin
+
+  goal-npc:
+    description: NPC management commands
+    usage: /goal-npc <subcommand>
+    permission: goal.admin
+
+permissions:
+  goal.use:
+    description: Allows using goal commands
+    default: true
+  goal.admin:
+    description: Allows using admin goal commands
+    default: op
+  goal.view:
+    description: Allows viewing goal progress
+    default: true

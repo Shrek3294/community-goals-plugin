@@ -1,0 +1,66 @@
+# Community Goals Plugin Configuration
+
+# Plugin settings
+plugin:
+  name: "Community Goals"
+  version: "1.0.0"
+  language: "en"
+
+# Goals configuration
+goals:
+  # Enable/disable goal announcements
+  announcements-enabled: true
+  
+  # Announcement frequency (in minutes)
+  announcement-interval: 10
+  
+  # Default target progress for new goals
+  default-target: 100
+
+# World border configuration
+world-border:
+  # Enabled or disabled
+  enabled: true
+  
+  # World name to apply border to
+  world: "world"
+  
+  # Border center coordinates
+  center-x: 0
+  center-z: 0
+  
+  # Initial border size
+  initial-size: 50
+  
+  # Amount to expand on goal completion (in blocks)
+  expansion-amount: 20
+
+# Command permissions
+commands:
+  # Require permission to use goal commands
+  require-permission: true
+  
+  # Admin command require op
+  admin-require-op: true
+
+# Persistence
+persistence:
+  # Storage type (yaml, json, database)
+  type: "yaml"
+  
+  # Auto-save interval (in minutes)
+  auto-save-interval: 5
+  
+  # Data folder
+  data-folder: "data"
+
+# Logging
+logging:
+  # Log level (INFO, DEBUG, WARNING, ERROR)
+  level: "INFO"
+  
+  # Log to file
+  file-enabled: true
+  
+  # Log file name
+  file-name: "plugin.log"
