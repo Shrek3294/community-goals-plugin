@@ -207,28 +207,6 @@ You can run several goals simultaneously:
 | `communitygoals.player` | Use basic player commands (`/goal`) | Everyone |
 | `communitygoals.admin` | Use all admin commands (`/goal-admin`) | OP only |
 
-### **Setting Up Permissions**
-
-For **LuckPerms**:
-```bash
-# Give all players basic access
-/lp group default permission set communitygoals.player true
-
-# Give admins full access
-/lp group admin permission set communitygoals.admin true
-```
-
-For **PermissionsEx**:
-```bash
-# In permissions.yml
-groups:
-  default:
-    permissions:
-      - communitygoals.player
-  admin:
-    permissions:
-      - communitygoals.admin
-```
 
 ---
 

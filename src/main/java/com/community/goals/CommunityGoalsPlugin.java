@@ -169,14 +169,21 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             String message = String.format("§6§l[Community Goals] §a%s completed! §7Expanding world border...", goal.getName());
             getServer().broadcastMessage(message);
             
+            // Get border info before expansion
+            BorderExpansionManager.BorderInfo beforeInfo = borderExpansionManager.getInfo();
+            getLogger().info("Border before expansion: " + beforeInfo.currentSize);
+            
             // Expand the border
             if (borderExpansionManager.expandBorder()) {
-                BorderExpansionManager.BorderInfo info = borderExpansionManager.getInfo();
-                String borderMessage = String.format("§6§l[Community Goals] §7World border expanded to §f%.0f blocks§7!", info.currentSize);
+                BorderExpansionManager.BorderInfo afterInfo = borderExpansionManager.getInfo();
+                getLogger().info("Border after expansion: " + afterInfo.currentSize);
+                
+                String borderMessage = String.format("§6§l[Community Goals] §7World border expanded to §f%.0f blocks§7!", afterInfo.currentSize);
                 getServer().broadcastMessage(borderMessage);
                 
                 // Save border configuration
                 saveBorderConfig();
+                getLogger().info("Border configuration saved to config file");
             } else {
                 getServer().broadcastMessage("§c§l[Community Goals] §7Failed to expand world border!");
             }

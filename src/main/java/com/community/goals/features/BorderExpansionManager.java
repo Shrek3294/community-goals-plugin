@@ -62,10 +62,13 @@ public class BorderExpansionManager {
             double currentSize = wb.getSize();
             double newSize = currentSize + amount;
 
+            // Update our internal config immediately (before animation)
+            borderConfig.expandBorder(amount);
+            
             // Animate the border expansion over 30 seconds
             wb.setSize(newSize, 30);
             
-            borderConfig.expandBorder(amount);
+            System.out.println("Border expanded from " + currentSize + " to " + newSize + " (+" + amount + ")");
             return true;
         } catch (Exception e) {
             System.err.println("Failed to expand world border: " + e.getMessage());
@@ -167,7 +170,7 @@ public class BorderExpansionManager {
                 borderConfig.getWorldName(),
                 wb.getCenter().getX(),
                 wb.getCenter().getZ(),
-                wb.getSize(),
+                borderConfig.getSize(), // Use config size (target size) instead of current animated size
                 borderConfig.getExpansionAmount()
             );
         }
