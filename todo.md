@@ -33,6 +33,14 @@
   - [ ] Config option to enable/disable queue mode vs multiple active goals
   - [ ] Queue status display showing upcoming goals
 
+- [ ] **Per-Goal Reward System**: Allow different border expansion amounts per goal
+  - [ ] Add reward/expansion amount field to Goal model
+  - [ ] Update create command to accept custom reward: `/goal-admin create <id> <name> <target> <reward> [description]`
+  - [ ] Modify goal completion to use individual goal rewards instead of global config
+  - [ ] Add command to modify existing goal rewards: `/goal-admin setreward <id> <amount>`
+  - [ ] Display reward amount in goal info and list commands
+  - [ ] Backward compatibility with global expansion amount as default
+
 ## Testing
 - [x] Local testing and validation
 - [x] Item turn-in testing
