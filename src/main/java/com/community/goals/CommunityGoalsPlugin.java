@@ -5,7 +5,7 @@ import com.community.goals.features.BorderExpansionManager;
 import com.community.goals.features.ProgressAnnouncementManager;
 import com.community.goals.logic.GoalProgressTracker;
 import com.community.goals.logic.TurnInHandler;
-import com.community.goals.npc.CitizensNPCManager;
+import com.community.goals.npc.FancyNpcManager;
 import com.community.goals.npc.NPCInteractionHandler;
 import com.community.goals.persistence.ConfigManager;
 import com.community.goals.persistence.PersistenceManager;
@@ -23,7 +23,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     private ConfigManager configManager;
     private BorderExpansionManager borderExpansionManager;
     private ProgressAnnouncementManager announcementManager;
-    private CitizensNPCManager npcManager;
+    private FancyNpcManager npcManager;
     private NPCInteractionHandler npcInteractionHandler;
     private TurnInHandler turnInHandler;
 
@@ -66,7 +66,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             announcementManager = new ProgressAnnouncementManager();
 
             // Initialize NPC system
-            npcManager = new CitizensNPCManager();
+            npcManager = new FancyNpcManager(this);
             npcInteractionHandler = new NPCInteractionHandler(npcManager, goalProgressTracker);
 
             // Register commands
@@ -150,7 +150,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     /**
      * Get the NPC manager
      */
-    public CitizensNPCManager getNpcManager() {
+    public FancyNpcManager getNpcManager() {
         return npcManager;
     }
 

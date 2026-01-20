@@ -2,20 +2,22 @@ package com.community.goals.npc;
 
 import com.community.goals.Goal;
 import com.community.goals.logic.GoalProgressTracker;
+import de.oliver.fancynpcs.api.Npc;
+import de.oliver.fancynpcs.api.events.NpcInteractEvent;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
 /**
- * Handles interactions with goal NPCs
- * 
- * Note: This is a simplified stub implementation.
- * NPC integration requires FancyNpcs plugin to be installed.
+ * Handles interactions with goal NPCs via FancyNpcs.
  */
 public class NPCInteractionHandler implements Listener {
-    private final CitizensNPCManager npcManager;
+    private final FancyNpcManager npcManager;
+    private final GoalProgressTracker progressTracker;
 
-    public NPCInteractionHandler(CitizensNPCManager npcManager, GoalProgressTracker progressTracker) {
+    public NPCInteractionHandler(FancyNpcManager npcManager, GoalProgressTracker progressTracker) {
         this.npcManager = npcManager;
+        this.progressTracker = progressTracker;
     }
 
     /**
@@ -45,7 +47,32 @@ public class NPCInteractionHandler implements Listener {
     /**
      * Check if NPC support is available
      */
-    public boolean isCitizensAvailable() {
+    public boolean isFancyNpcsAvailable() {
         return npcManager.canCreateNPCs();
+    }
+
+    @EventHandler
+    public void onNpcInteract(NpcInteractEvent event) {
+        if (!npcManager.canCreateNPCs()) {
+            return;
+        }
+
+        Npc npc = event.getNpc();
+        if (npc == null || npc.getData() == null) {
+            return;
+        }
+
+        String goalId = npcManager.getGoalIdForNpc(npc.getData().getName());
+        if (goalId == null) {
+            return;
+        }
+
+        Goal goal = progressTracker.getGoal(goalId);
+        if (goal == null) {
+            return;
+        }
+
+        displayGoalInfo(event.getPlayer(), goal);
+        event.setCancelled(true);
     }
 }

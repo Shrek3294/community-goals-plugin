@@ -5,6 +5,8 @@ api-version: 1.21
 description: A plugin for managing community goals with world border expansion
 authors:
   - Community
+softdepend:
+  - FancyNpcs
 
 commands:
   goal:

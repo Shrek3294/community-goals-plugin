@@ -154,6 +154,25 @@ persistence:
 
 You should see server-wide messages and the border expanding!
 
+### **Step 5 (Optional): Add FancyNpcs Goal NPCs**
+To use NPCs, install the FancyNpcs plugin on your server and restart. Then stand where you want the NPC and run:
+```bash
+/goal-npc link <npc_name> <goal_id>
+```
+
+Example:
+```bash
+/goal-npc link GoalGuide wood_collection
+```
+
+The NPC will spawn at your location. When players right-click it, they will see the goal info.
+
+Other useful commands:
+```bash
+/goal-npc list
+/goal-npc unlink <npc_name>
+```
+
 ---
 
 ## 🎮 Gameplay Examples

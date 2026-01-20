@@ -1,28 +1,29 @@
 package com.community.goals.npc;
 
+import de.oliver.fancynpcs.api.Npc;
 import org.bukkit.Location;
 
 /**
- * Wrapper class for an NPC associated with a goal
- * 
- * Note: This is a simplified stub implementation.
+ * Wrapper class for an NPC associated with a goal.
  */
 public class GoalNPC {
+    private final Npc npc;
     private final String npcName;
     private final String goalId;
     private final Location location;
 
-    public GoalNPC(Object npc, String goalId) {
+    public GoalNPC(Npc npc, String goalId, Location location) {
+        this.npc = npc;
         this.goalId = goalId;
-        this.npcName = "NPC_" + goalId;
-        this.location = null;
+        this.location = location;
+        this.npcName = npc != null ? npc.getData().getName() : null;
     }
 
     /**
      * Get the underlying NPC
      */
-    public Object getNPC() {
-        return null;
+    public Npc getNPC() {
+        return npc;
     }
 
     /**
@@ -43,6 +44,9 @@ public class GoalNPC {
      * Get the NPC location
      */
     public Location getLocation() {
+        if (npc != null && npc.getData().getLocation() != null) {
+            return npc.getData().getLocation();
+        }
         return location;
     }
 
@@ -50,21 +54,26 @@ public class GoalNPC {
      * Check if the NPC is spawned
      */
     public boolean isSpawned() {
-        return false;
+        return npc != null;
     }
 
     /**
      * Despawn the NPC
      */
     public void despawn() {
-        // Stub
+        if (npc != null) {
+            npc.removeForAll();
+        }
     }
 
     /**
      * Teleport the NPC
      */
     public void teleport(Location location) {
-        // Stub
+        if (npc != null && location != null) {
+            npc.getData().setLocation(location);
+            npc.updateForAll();
+        }
     }
 
     /**
@@ -79,7 +88,7 @@ public class GoalNPC {
         return "GoalNPC{" +
                 "name='" + npcName + '\'' +
                 ", goalId='" + goalId + '\'' +
-                ", spawned=false" +
+                ", spawned=" + (npc != null) +
                 '}';
     }
 }

@@ -2,7 +2,7 @@ package com.community.goals.commands;
 
 import com.community.goals.Goal;
 import com.community.goals.logic.GoalProgressTracker;
-import com.community.goals.npc.CitizensNPCManager;
+import com.community.goals.npc.FancyNpcManager;
 import com.community.goals.persistence.PersistenceManager;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
@@ -13,9 +13,9 @@ import org.bukkit.entity.Player;
  * Handles /goal npc commands for linking NPCs to goals
  */
 public class NPCCommand extends BaseCommand {
-    private final CitizensNPCManager npcManager;
+    private final FancyNpcManager npcManager;
 
-    public NPCCommand(GoalProgressTracker tracker, PersistenceManager persistence, CitizensNPCManager npcManager) {
+    public NPCCommand(GoalProgressTracker tracker, PersistenceManager persistence, FancyNpcManager npcManager) {
         super(tracker, persistence);
         this.npcManager = npcManager;
     }
@@ -27,12 +27,12 @@ public class NPCCommand extends BaseCommand {
             return true;
         }
 
-        if (args.length < 2) {
+        if (args.length < 1) {
             sendUsage(sender);
             return true;
         }
 
-        String subcommand = args[1].toLowerCase();
+        String subcommand = args[0].toLowerCase();
 
         switch (subcommand) {
             case "link":
@@ -51,8 +51,8 @@ public class NPCCommand extends BaseCommand {
      * Handle /goal npc link <npc_name> <goal_id> command
      */
     private boolean handleLink(CommandSender sender, String[] args) {
-        if (args.length < 4) {
-            sendError(sender, "Usage: /goal npc link <npc_name> <goal_id>");
+        if (args.length < 3) {
+            sendError(sender, "Usage: /goal-npc link <npc_name> <goal_id>");
             return true;
         }
 
@@ -61,8 +61,8 @@ public class NPCCommand extends BaseCommand {
             return true;
         }
 
-        String npcName = args[2];
-        String goalId = args[3];
+        String npcName = args[1];
+        String goalId = args[2];
 
         // Verify goal exists
         Goal goal = tracker.getGoal(goalId);
@@ -72,11 +72,13 @@ public class NPCCommand extends BaseCommand {
         }
 
         try {
-            // Get the NPC location from the player if available
-            Location location = null;
-            if (sender instanceof Player) {
-                location = ((Player) sender).getLocation();
+            if (!(sender instanceof Player)) {
+                sendError(sender, "Only players can link NPCs (needs a location).");
+                return true;
             }
+
+            // Get the NPC location from the player
+            Location location = ((Player) sender).getLocation();
 
             // Create the goal NPC association
             npcManager.createGoalNPC(npcName, goalId, location);
@@ -99,12 +101,12 @@ public class NPCCommand extends BaseCommand {
      * Handle /goal npc unlink <npc_name> command
      */
     private boolean handleUnlink(CommandSender sender, String[] args) {
-        if (args.length < 3) {
-            sendError(sender, "Usage: /goal npc unlink <npc_name>");
+        if (args.length < 2) {
+            sendError(sender, "Usage: /goal-npc unlink <npc_name>");
             return true;
         }
 
-        String npcName = args[2];
+        String npcName = args[1];
 
         try {
             if (npcManager.deleteNPC(npcName)) {
@@ -142,12 +144,9 @@ public class NPCCommand extends BaseCommand {
         sender.sendMessage("");
 
         int index = 1;
-        @SuppressWarnings("unused")
-        var allNpcsArray = allNpcs.toArray();
-        for (int i = 0; i < allNpcsArray.length; i++) {
-            // The stub implementation returns null for NPC objects
-            // In a real FancyNpcs integration, you would show actual NPC details
-            sender.sendMessage("§7" + index + ". §e[NPC Linked]");
+        for (var npc : allNpcs) {
+            String npcLabel = npc.getName() != null ? npc.getName() : "(missing)";
+            sender.sendMessage("§7" + index + ". §e" + npcLabel + " §7-> §f" + npc.getGoalId());
             index++;
         }
 
@@ -161,9 +160,9 @@ public class NPCCommand extends BaseCommand {
     private void sendUsage(CommandSender sender) {
         sender.sendMessage("");
         sender.sendMessage("§6§l=== NPC Command Usage ===");
-        sender.sendMessage("§7/goal npc link <npc_name> <goal_id> - Link NPC to goal");
-        sender.sendMessage("§7/goal npc unlink <npc_name> - Unlink NPC from goal");
-        sender.sendMessage("§7/goal npc list - List all linked NPCs");
+        sender.sendMessage("§7/goal-npc link <npc_name> <goal_id> - Link NPC to goal");
+        sender.sendMessage("§7/goal-npc unlink <npc_name> - Unlink NPC from goal");
+        sender.sendMessage("§7/goal-npc list - List all linked NPCs");
         sender.sendMessage("");
     }
 }

@@ -11,7 +11,7 @@
 ## Core Logic
 - [x] Implement goal progress tracking logic
 - [x] Implement command turn-in handler
-- [x] Implement Citizens NPC integration
+- [x] Implement FancyNpcs integration
 
 ## Features
 - [x] Implement world border expansion
