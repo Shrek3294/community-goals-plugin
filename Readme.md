@@ -51,7 +51,7 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 #### **Goal Management**
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/goal-admin create <id> <name> <target> [description]` | Create a new community goal | `/goal-admin create diamonds "Diamond Collection" 1000 "Collect 1000 diamonds to expand the border"` |
+| `/goal-admin create <id> <name> <target> [reward] [description]` | Create a new community goal | `/goal-admin create diamonds "Diamond Collection" 1000 200 "Collect 1000 diamonds to expand the border"` |
 | `/goal-admin delete <id>` | Permanently delete a goal | `/goal-admin delete diamonds` |
 | `/goal-admin info <id>` | View detailed goal information including creation date | `/goal-admin info diamonds` |
 | `/goal-admin list` | Display all goals with progress bars and completion status | `/goal-admin list` |
@@ -62,11 +62,17 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 | `/goal-admin setprogress <id> <amount>` | Set exact progress amount for a goal | `/goal-admin setprogress diamonds 750` |
 | `/goal-admin complete <id>` | Instantly complete a goal (triggers border expansion) | `/goal-admin complete diamonds` |
 | `/goal-admin setstate <id> <state>` | Change goal state (ACTIVE, PAUSED, COMPLETED, CANCELLED) | `/goal-admin setstate diamonds PAUSED` |
+| `/goal-admin setreward <id> <amount>` | Set per-goal border expansion reward | `/goal-admin setreward diamonds 200` |
 
 #### **System Management**
 | Command | Description | Example |
 |---------|-------------|---------|
 | `/goal-admin save` | Force save all goals to disk | `/goal-admin save` |
+| `/goal-admin queue list` | List queued goals and active goal | `/goal-admin queue list` |
+| `/goal-admin queue add <id>` | Add a goal to the queue | `/goal-admin queue add diamonds` |
+| `/goal-admin queue remove <id>` | Remove a goal from the queue | `/goal-admin queue remove diamonds` |
+| `/goal-admin queue move <id> <pos>` | Move a goal in the queue | `/goal-admin queue move diamonds 2` |
+| `/goal-admin queue next` | Activate the next queued goal | `/goal-admin queue next` |
 
 #### **World Border Management**
 | Command | Description | Example |
@@ -98,6 +104,7 @@ world-border:
 goals:
   announcements-enabled: true       # Enable server-wide completion announcements
   auto-save-interval: 5             # Minutes between automatic saves
+  queue-enabled: false              # Enable goal queue mode (one active goal at a time)
 
 # Persistence settings
 persistence:
@@ -110,6 +117,7 @@ persistence:
 - **World Name**: Make sure `world-border.world` matches your main world name exactly
 - **Initial Size**: Set `initial-size` to your current border size to avoid resets
 - **Expansion Amount**: Adjust `expansion-amount` based on your server's progression pace
+- **Per-Goal Rewards**: Use `/goal-admin setreward` or the create reward field to override the default expansion
 - **Auto-save**: Lower intervals provide better data safety but may impact performance
 
 ---
@@ -167,10 +175,23 @@ Example:
 
 The NPC will spawn at your location. When players right-click it, they will see the goal info.
 
+To set the **central goals NPC** that opens the goals GUI:
+```bash
+/goal-npc central set <npc_name>
+```
+
+Example:
+```bash
+/goal-npc central set GoalsHub
+```
+
+Right-clicking this NPC opens the goals menu (3 goals at a time). Locked goals are shown but not clickable.
+
 Other useful commands:
 ```bash
 /goal-npc list
 /goal-npc unlink <npc_name>
+/goal-npc central remove
 ```
 
 ---

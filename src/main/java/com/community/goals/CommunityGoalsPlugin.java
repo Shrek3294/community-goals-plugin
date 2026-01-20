@@ -3,7 +3,9 @@ package com.community.goals;
 import com.community.goals.commands.*;
 import com.community.goals.features.BorderExpansionManager;
 import com.community.goals.features.ProgressAnnouncementManager;
+import com.community.goals.gui.GoalGuiManager;
 import com.community.goals.logic.GoalProgressTracker;
+import com.community.goals.logic.GoalQueueManager;
 import com.community.goals.logic.TurnInHandler;
 import com.community.goals.npc.FancyNpcManager;
 import com.community.goals.npc.NPCInteractionHandler;
@@ -26,6 +28,8 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     private FancyNpcManager npcManager;
     private NPCInteractionHandler npcInteractionHandler;
     private TurnInHandler turnInHandler;
+    private GoalGuiManager goalGuiManager;
+    private GoalQueueManager goalQueueManager;
 
     @Override
     public void onEnable() {
@@ -40,15 +44,18 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             // Initialize configuration
             saveDefaultConfig();
             String configPath = Paths.get(getDataFolder().getAbsolutePath(), "config.yml").toString();
-            configManager = new ConfigManager(configPath);
+            configManager = new ConfigManager(configPath, getLogger());
 
             // Initialize persistence
             String dataPath = Paths.get(getDataFolder().getAbsolutePath(), "data").toString();
-            persistenceManager = new PersistenceManager(dataPath);
+            persistenceManager = new PersistenceManager(dataPath, getLogger());
 
             // Initialize core logic
             goalProgressTracker = new GoalProgressTracker(persistenceManager);
             turnInHandler = new TurnInHandler(goalProgressTracker);
+            goalGuiManager = new GoalGuiManager(goalProgressTracker, turnInHandler);
+            boolean queueEnabled = configManager.getBoolean("goals.queue-enabled", false);
+            goalQueueManager = new GoalQueueManager(goalProgressTracker, persistenceManager, queueEnabled);
             
             // Register goal completion listener for border expansion and announcements
             goalProgressTracker.addListener(new GoalCompletionHandler());
@@ -61,19 +68,20 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             long expansionAmount = configManager.getLong("world-border.expansion-amount", 100L);
 
             Border borderConfig = new Border(worldName, centerX, centerZ, initialSize, expansionAmount);
-            borderExpansionManager = new BorderExpansionManager(borderConfig);
+            borderExpansionManager = new BorderExpansionManager(borderConfig, getLogger());
 
             announcementManager = new ProgressAnnouncementManager();
 
             // Initialize NPC system
             npcManager = new FancyNpcManager(this);
-            npcInteractionHandler = new NPCInteractionHandler(npcManager, goalProgressTracker);
+            npcInteractionHandler = new NPCInteractionHandler(npcManager, goalProgressTracker, goalGuiManager);
 
             // Register commands
             registerCommands();
 
             // Register event listeners
             getServer().getPluginManager().registerEvents(npcInteractionHandler, this);
+            getServer().getPluginManager().registerEvents(goalGuiManager, this);
 
             getLogger().info("Community Goals plugin enabled successfully!");
         } catch (Exception e) {
@@ -109,7 +117,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
         getCommand("goal").setExecutor(playerCommand);
 
         // Admin commands
-        GoalAdminCommand adminCommand = new GoalAdminCommand(goalProgressTracker, persistenceManager, borderExpansionManager, configManager);
+        GoalAdminCommand adminCommand = new GoalAdminCommand(goalProgressTracker, persistenceManager, borderExpansionManager, configManager, goalQueueManager, getLogger());
         getCommand("goal-admin").setExecutor(adminCommand);
 
         // NPC commands
@@ -154,6 +162,10 @@ public class CommunityGoalsPlugin extends JavaPlugin {
         return npcManager;
     }
 
+    public GoalQueueManager getGoalQueueManager() {
+        return goalQueueManager;
+    }
+
     /**
      * Handles goal completion events
      */
@@ -161,6 +173,9 @@ public class CommunityGoalsPlugin extends JavaPlugin {
         @Override
         public void onProgressUpdated(Goal goal, long previousProgress, long amountAdded) {
             // Handle progress updates if needed
+            if (goalGuiManager != null) {
+                goalGuiManager.refreshOpenGoalsMenus();
+            }
         }
 
         @Override
@@ -173,8 +188,12 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             BorderExpansionManager.BorderInfo beforeInfo = borderExpansionManager.getInfo();
             getLogger().info("Border before expansion: " + beforeInfo.currentSize);
             
+            double expansionAmount = goal.getRewardExpansion() > 0
+                ? goal.getRewardExpansion()
+                : borderExpansionManager.getBorderConfig().getExpansionAmount();
+
             // Expand the border
-            if (borderExpansionManager.expandBorder()) {
+            if (borderExpansionManager.expandBorder(expansionAmount)) {
                 BorderExpansionManager.BorderInfo afterInfo = borderExpansionManager.getInfo();
                 getLogger().info("Border after expansion: " + afterInfo.currentSize);
                 
@@ -187,21 +206,37 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             } else {
                 getServer().broadcastMessage("§c§l[Community Goals] §7Failed to expand world border!");
             }
+
+            npcManager.deleteNPCsForGoal(goal.getId());
+            if (goalQueueManager != null && goalQueueManager.isEnabled()) {
+                goalQueueManager.handleGoalCompleted(goal.getId());
+            }
+            goalProgressTracker.deleteGoal(goal.getId());
+            goalGuiManager.refreshOpenGoalsMenus();
         }
 
         @Override
         public void onGoalCreated(Goal goal) {
             // Handle goal creation if needed
+            if (goalGuiManager != null) {
+                goalGuiManager.refreshOpenGoalsMenus();
+            }
         }
 
         @Override
         public void onGoalDeleted(Goal goal) {
             // Handle goal deletion if needed
+            if (goalGuiManager != null) {
+                goalGuiManager.refreshOpenGoalsMenus();
+            }
         }
 
         @Override
         public void onGoalUpdated(Goal goal) {
             // Handle goal updates if needed
+            if (goalGuiManager != null) {
+                goalGuiManager.refreshOpenGoalsMenus();
+            }
         }
     }
 

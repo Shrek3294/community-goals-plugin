@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Manages loading and accessing plugin configuration
@@ -16,10 +17,12 @@ public class ConfigManager {
     private final Path configPath;
     private Map<String, Object> configData;
     private final Yaml yaml;
+    private final Logger logger;
 
-    public ConfigManager(String configFilePath) {
+    public ConfigManager(String configFilePath, Logger logger) {
         this.configPath = Paths.get(configFilePath);
         this.yaml = new Yaml();
+        this.logger = logger;
         loadConfig();
     }
 
@@ -29,7 +32,7 @@ public class ConfigManager {
     private void loadConfig() {
         try {
             if (!Files.exists(configPath)) {
-                System.err.println("Config file not found: " + configPath);
+                logger.warning("Config file not found: " + configPath);
                 configData = new HashMap<>();
                 return;
             }
@@ -41,7 +44,7 @@ public class ConfigManager {
                 }
             }
         } catch (IOException e) {
-            System.err.println("Failed to load config: " + e.getMessage());
+            logger.warning("Failed to load config: " + e.getMessage());
             configData = new HashMap<>();
         }
     }
@@ -175,7 +178,7 @@ public class ConfigManager {
                 yaml.dump(configData, writer);
             }
         } catch (IOException e) {
-            System.err.println("Failed to save config: " + e.getMessage());
+            logger.warning("Failed to save config: " + e.getMessage());
         }
     }
 }

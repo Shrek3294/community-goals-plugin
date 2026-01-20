@@ -1,6 +1,7 @@
 package com.community.goals.npc;
 
 import com.community.goals.Goal;
+import com.community.goals.gui.GoalGuiManager;
 import com.community.goals.logic.GoalProgressTracker;
 import de.oliver.fancynpcs.api.Npc;
 import de.oliver.fancynpcs.api.events.NpcInteractEvent;
@@ -14,10 +15,12 @@ import org.bukkit.event.Listener;
 public class NPCInteractionHandler implements Listener {
     private final FancyNpcManager npcManager;
     private final GoalProgressTracker progressTracker;
+    private final GoalGuiManager guiManager;
 
-    public NPCInteractionHandler(FancyNpcManager npcManager, GoalProgressTracker progressTracker) {
+    public NPCInteractionHandler(FancyNpcManager npcManager, GoalProgressTracker progressTracker, GoalGuiManager guiManager) {
         this.npcManager = npcManager;
         this.progressTracker = progressTracker;
+        this.guiManager = guiManager;
     }
 
     /**
@@ -29,6 +32,9 @@ public class NPCInteractionHandler implements Listener {
         player.sendMessage("§7Description: " + goal.getDescription());
         player.sendMessage("§7Progress: " + goal.getCurrentProgress() + " / " + goal.getTargetProgress());
         player.sendMessage(String.format("§7Completion: §a%.1f%%", goal.getProgressPercentage()));
+        if (goal.getRewardExpansion() > 0) {
+            player.sendMessage("§7Reward Expansion: §f" + goal.getRewardExpansion() + " blocks");
+        }
         player.sendMessage("§7Status: " + goal.getState().getColoredName());
         player.sendMessage("");
     }
@@ -62,7 +68,14 @@ public class NPCInteractionHandler implements Listener {
             return;
         }
 
-        String goalId = npcManager.getGoalIdForNpc(npc.getData().getName());
+        String npcName = npc.getData().getName();
+        if (npcManager.isCentralNpc(npcName)) {
+            guiManager.openGoalsMenu(event.getPlayer());
+            event.setCancelled(true);
+            return;
+        }
+
+        String goalId = npcManager.getGoalIdForNpc(npcName);
         if (goalId == null) {
             return;
         }

@@ -9,6 +9,7 @@ public class Goal {
     private final String description;
     private long currentProgress;
     private long targetProgress;
+    private double rewardExpansion;
     private State state;
     private long createdAt;
     private long completedAt;
@@ -22,6 +23,7 @@ public class Goal {
         this.state = State.ACTIVE;
         this.createdAt = System.currentTimeMillis();
         this.completedAt = 0;
+        this.rewardExpansion = 0;
     }
 
     public String getId() {
@@ -53,6 +55,14 @@ public class Goal {
 
     public void setTargetProgress(long targetProgress) {
         this.targetProgress = targetProgress;
+    }
+
+    public double getRewardExpansion() {
+        return rewardExpansion;
+    }
+
+    public void setRewardExpansion(double rewardExpansion) {
+        this.rewardExpansion = rewardExpansion;
     }
 
     public State getState() {
@@ -93,6 +103,7 @@ public class Goal {
                 ", name='" + name + '\'' +
                 ", currentProgress=" + currentProgress +
                 ", targetProgress=" + targetProgress +
+                ", rewardExpansion=" + rewardExpansion +
                 ", state=" + state +
                 ", percentage=" + String.format("%.2f", getProgressPercentage()) + "%" +
                 '}';

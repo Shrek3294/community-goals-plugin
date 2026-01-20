@@ -26,20 +26,20 @@
 - [x] Add permissions and security checks
 
 ## Future Features
-- [ ] **Goal Queue System**: Implement a system where only one goal can be active at a time
-  - [ ] Add goal queue/waiting list functionality
-  - [ ] Auto-activate next goal when current one completes
-  - [ ] Commands to manage goal queue (add to queue, reorder, remove from queue)
-  - [ ] Config option to enable/disable queue mode vs multiple active goals
-  - [ ] Queue status display showing upcoming goals
+- [x] **Goal Queue System**: Implement a system where only one goal can be active at a time
+  - [x] Add goal queue/waiting list functionality
+  - [x] Auto-activate next goal when current one completes
+  - [x] Commands to manage goal queue (add to queue, reorder, remove from queue)
+  - [x] Config option to enable/disable queue mode vs multiple active goals
+  - [x] Queue status display showing upcoming goals
 
-- [ ] **Per-Goal Reward System**: Allow different border expansion amounts per goal
-  - [ ] Add reward/expansion amount field to Goal model
-  - [ ] Update create command to accept custom reward: `/goal-admin create <id> <name> <target> <reward> [description]`
-  - [ ] Modify goal completion to use individual goal rewards instead of global config
-  - [ ] Add command to modify existing goal rewards: `/goal-admin setreward <id> <amount>`
-  - [ ] Display reward amount in goal info and list commands
-  - [ ] Backward compatibility with global expansion amount as default
+- [x] **Per-Goal Reward System**: Allow different border expansion amounts per goal
+  - [x] Add reward/expansion amount field to Goal model
+  - [x] Update create command to accept custom reward: `/goal-admin create <id> <name> <target> <reward> [description]`
+  - [x] Modify goal completion to use individual goal rewards instead of global config
+  - [x] Add command to modify existing goal rewards: `/goal-admin setreward <id> <amount>`
+  - [x] Display reward amount in goal info and list commands
+  - [x] Backward compatibility with global expansion amount as default
 
 ## Testing
 - [x] Local testing and validation

@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Manages persistence of goals to YAML files
@@ -17,15 +18,18 @@ public class PersistenceManager {
     private final Path dataFolder;
     private final Yaml yaml;
     private final String goalsFile = "goals.yml";
+    private final String queueFile = "goal-queue.yml";
+    private final Logger logger;
 
-    public PersistenceManager(String dataFolderPath) {
+    public PersistenceManager(String dataFolderPath, Logger logger) {
         this.dataFolder = Paths.get(dataFolderPath);
         this.yaml = new Yaml();
+        this.logger = logger;
         
         try {
             Files.createDirectories(dataFolder);
         } catch (IOException e) {
-            System.err.println("Failed to create data folder: " + e.getMessage());
+            logger.warning("Failed to create data folder: " + e.getMessage());
         }
     }
 
@@ -50,7 +54,7 @@ public class PersistenceManager {
                 yaml.dump(root, writer);
             }
         } catch (IOException e) {
-            System.err.println("Failed to save goals: " + e.getMessage());
+            logger.warning("Failed to save goals: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -86,7 +90,7 @@ public class PersistenceManager {
                 }
             }
         } catch (IOException e) {
-            System.err.println("Failed to load goals: " + e.getMessage());
+            logger.warning("Failed to load goals: " + e.getMessage());
             e.printStackTrace();
         }
         
@@ -122,6 +126,7 @@ public class PersistenceManager {
         map.put("description", goal.getDescription());
         map.put("current-progress", goal.getCurrentProgress());
         map.put("target-progress", goal.getTargetProgress());
+        map.put("reward-expansion", goal.getRewardExpansion());
         map.put("state", goal.getState().name());
         map.put("created-at", goal.getCreatedAt());
         map.put("completed-at", goal.getCompletedAt());
@@ -141,7 +146,14 @@ public class PersistenceManager {
             Goal goal = new Goal(id, name, description, targetProgress);
             
             Long currentProgress = ((Number) map.get("current-progress")).longValue();
-            goal.addProgress(currentProgress);
+            if (currentProgress > 0) {
+                goal.addProgress(currentProgress);
+            }
+
+            Object rewardRaw = map.get("reward-expansion");
+            if (rewardRaw instanceof Number) {
+                goal.setRewardExpansion(((Number) rewardRaw).doubleValue());
+            }
             
             String stateName = (String) map.get("state");
             if (stateName != null) {
@@ -150,7 +162,7 @@ public class PersistenceManager {
 
             return goal;
         } catch (Exception e) {
-            System.err.println("Failed to deserialize goal from map: " + e.getMessage());
+            logger.warning("Failed to deserialize goal from map: " + e.getMessage());
             return null;
         }
     }
@@ -160,6 +172,54 @@ public class PersistenceManager {
      */
     public boolean goalsFileExists() {
         return Files.exists(dataFolder.resolve(goalsFile));
+    }
+
+    /**
+     * Save goal queue to YAML file
+     */
+    public void saveGoalQueue(List<String> queue) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("queue", new ArrayList<>(queue));
+        root.put("last-updated", System.currentTimeMillis());
+
+        Path filePath = dataFolder.resolve(queueFile);
+        try (FileWriter writer = new FileWriter(filePath.toFile())) {
+            yaml.dump(root, writer);
+        } catch (IOException e) {
+            logger.warning("Failed to save goal queue: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Load goal queue from YAML file
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> loadGoalQueue() {
+        List<String> queue = new ArrayList<>();
+        Path filePath = dataFolder.resolve(queueFile);
+        if (!Files.exists(filePath)) {
+            return queue;
+        }
+
+        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
+            Map<String, Object> data = yaml.load(fis);
+            if (data == null) {
+                return queue;
+            }
+            Object raw = data.get("queue");
+            if (!(raw instanceof List)) {
+                return queue;
+            }
+            for (Object entry : (List<?>) raw) {
+                if (entry != null) {
+                    queue.add(String.valueOf(entry));
+                }
+            }
+        } catch (IOException e) {
+            logger.warning("Failed to load goal queue: " + e.getMessage());
+        }
+
+        return queue;
     }
 
     /**

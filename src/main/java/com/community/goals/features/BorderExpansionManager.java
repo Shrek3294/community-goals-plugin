@@ -5,14 +5,18 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
 
+import java.util.logging.Logger;
+
 /**
  * Manages world border expansion for community goals
  */
 public class BorderExpansionManager {
     private final Border borderConfig;
+    private final Logger logger;
 
-    public BorderExpansionManager(Border borderConfig) {
+    public BorderExpansionManager(Border borderConfig, Logger logger) {
         this.borderConfig = borderConfig;
+        this.logger = logger;
         initializeBorder();
     }
 
@@ -31,12 +35,12 @@ public class BorderExpansionManager {
                 // Set size from config (this restores the border on server restart)
                 wb.setSize(borderConfig.getSize());
                 
-                System.out.println("World border initialized: Center(" + 
-                    borderConfig.getCenterX() + ", " + borderConfig.getCenterZ() + 
+                logger.info("World border initialized: Center(" +
+                    borderConfig.getCenterX() + ", " + borderConfig.getCenterZ() +
                     ") Size: " + borderConfig.getSize());
             }
         } catch (Exception e) {
-            System.err.println("Failed to initialize world border: " + e.getMessage());
+            logger.warning("Failed to initialize world border: " + e.getMessage());
         }
     }
 
@@ -54,7 +58,7 @@ public class BorderExpansionManager {
         try {
             World world = Bukkit.getWorld(borderConfig.getWorldName());
             if (world == null) {
-                System.err.println("World not found: " + borderConfig.getWorldName());
+                logger.warning("World not found: " + borderConfig.getWorldName());
                 return false;
             }
 
@@ -68,10 +72,10 @@ public class BorderExpansionManager {
             // Animate the border expansion over 30 seconds
             wb.setSize(newSize, 30);
             
-            System.out.println("Border expanded from " + currentSize + " to " + newSize + " (+" + amount + ")");
+            logger.info("Border expanded from " + currentSize + " to " + newSize + " (+" + amount + ")");
             return true;
         } catch (Exception e) {
-            System.err.println("Failed to expand world border: " + e.getMessage());
+            logger.warning("Failed to expand world border: " + e.getMessage());
             return false;
         }
     }
@@ -83,7 +87,7 @@ public class BorderExpansionManager {
         try {
             World world = Bukkit.getWorld(borderConfig.getWorldName());
             if (world == null) {
-                System.err.println("World not found: " + borderConfig.getWorldName());
+                logger.warning("World not found: " + borderConfig.getWorldName());
                 return false;
             }
 
@@ -92,7 +96,7 @@ public class BorderExpansionManager {
             borderConfig.setSize(size);
             return true;
         } catch (Exception e) {
-            System.err.println("Failed to set world border size: " + e.getMessage());
+            logger.warning("Failed to set world border size: " + e.getMessage());
             return false;
         }
     }
@@ -107,7 +111,7 @@ public class BorderExpansionManager {
                 return world.getWorldBorder().getSize();
             }
         } catch (Exception e) {
-            System.err.println("Failed to get world border size: " + e.getMessage());
+            logger.warning("Failed to get world border size: " + e.getMessage());
         }
         return borderConfig.getSize();
     }
@@ -130,7 +134,7 @@ public class BorderExpansionManager {
         try {
             World world = Bukkit.getWorld(borderConfig.getWorldName());
             if (world == null) {
-                System.err.println("World not found: " + borderConfig.getWorldName());
+                logger.warning("World not found: " + borderConfig.getWorldName());
                 return false;
             }
 
@@ -140,7 +144,7 @@ public class BorderExpansionManager {
             borderConfig.setCenterZ(z);
             return true;
         } catch (Exception e) {
-            System.err.println("Failed to set world border center: " + e.getMessage());
+            logger.warning("Failed to set world border center: " + e.getMessage());
             return false;
         }
     }

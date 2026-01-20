@@ -1,6 +1,7 @@
 package com.community.goals.logic;
 
 import com.community.goals.Goal;
+import com.community.goals.State;
 
 /**
  * Handles turn-in of progress (when players submit proof of progress)
@@ -27,6 +28,9 @@ public class TurnInHandler {
         // Validate goal is active
         if (goal.isCompleted()) {
             return TurnInResult.fail("Goal is already completed");
+        }
+        if (goal.getState() != State.ACTIVE) {
+            return TurnInResult.fail("Goal is not active");
         }
 
         // Validate amount
@@ -67,6 +71,9 @@ public class TurnInHandler {
 
         if (goal.isCompleted()) {
             return ValidationResult.invalid("Goal is already completed");
+        }
+        if (goal.getState() != State.ACTIVE) {
+            return ValidationResult.invalid("Goal is not active");
         }
 
         if (!validator.isValidAmount(amount)) {

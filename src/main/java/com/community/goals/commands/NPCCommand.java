@@ -41,6 +41,8 @@ public class NPCCommand extends BaseCommand {
                 return handleUnlink(sender, args);
             case "list":
                 return handleList(sender);
+            case "central":
+                return handleCentral(sender, args);
             default:
                 sendUsage(sender);
                 return true;
@@ -133,7 +135,9 @@ public class NPCCommand extends BaseCommand {
         }
 
         var allNpcs = npcManager.getAllNPCs();
-        if (allNpcs.isEmpty()) {
+        String centralName = npcManager.getCentralNpcName();
+        boolean hasCentral = centralName != null;
+        if (allNpcs.isEmpty() && !hasCentral) {
             sendError(sender, "No NPCs are currently linked to goals.");
             return true;
         }
@@ -144,6 +148,10 @@ public class NPCCommand extends BaseCommand {
         sender.sendMessage("");
 
         int index = 1;
+        if (hasCentral) {
+            sender.sendMessage("§7" + index + ". §b[Central] §e" + centralName);
+            index++;
+        }
         for (var npc : allNpcs) {
             String npcLabel = npc.getName() != null ? npc.getName() : "(missing)";
             sender.sendMessage("§7" + index + ". §e" + npcLabel + " §7-> §f" + npc.getGoalId());
@@ -163,6 +171,48 @@ public class NPCCommand extends BaseCommand {
         sender.sendMessage("§7/goal-npc link <npc_name> <goal_id> - Link NPC to goal");
         sender.sendMessage("§7/goal-npc unlink <npc_name> - Unlink NPC from goal");
         sender.sendMessage("§7/goal-npc list - List all linked NPCs");
+        sender.sendMessage("§7/goal-npc central set <npc_name> - Create central goals NPC");
+        sender.sendMessage("§7/goal-npc central remove - Remove central goals NPC");
         sender.sendMessage("");
+    }
+
+    private boolean handleCentral(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sendError(sender, "Usage: /goal-npc central <set|remove> [npc_name]");
+            return true;
+        }
+
+        String action = args[1].toLowerCase();
+        switch (action) {
+            case "set":
+                if (!(sender instanceof Player)) {
+                    sendError(sender, "Only players can set the central NPC.");
+                    return true;
+                }
+                if (args.length < 3) {
+                    sendError(sender, "Usage: /goal-npc central set <npc_name>");
+                    return true;
+                }
+                String npcName = args[2];
+                try {
+                    npcManager.setCentralNpc(npcName, ((Player) sender).getLocation());
+                    sendSuccess(sender, "§aCreated central NPC §e" + npcName);
+                    npcManager.saveNPCs();
+                    return true;
+                } catch (Exception e) {
+                    sendError(sender, "Failed to create central NPC: " + e.getMessage());
+                    return true;
+                }
+            case "remove":
+                if (npcManager.deleteCentralNpc()) {
+                    sendSuccess(sender, "§aRemoved central NPC.");
+                } else {
+                    sendError(sender, "No central NPC is configured.");
+                }
+                return true;
+            default:
+                sendError(sender, "Usage: /goal-npc central <set|remove> [npc_name]");
+                return true;
+        }
     }
 }

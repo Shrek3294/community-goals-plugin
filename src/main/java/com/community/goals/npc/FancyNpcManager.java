@@ -13,6 +13,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -22,11 +23,13 @@ import java.util.*;
  */
 public class FancyNpcManager {
     private static final String STORAGE_FILE = "npcs.yml";
+    private static final String CENTRAL_NPC_KEY = "central";
 
     private final JavaPlugin plugin;
     private final Path storagePath;
     private final Yaml yaml;
     private final Map<String, StoredNpc> npcByName;
+    private StoredNpc centralNpc;
 
     public FancyNpcManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -57,7 +60,7 @@ public class FancyNpcManager {
             throw new IllegalArgumentException("NPC already exists: " + npcName);
         }
 
-        NpcData data = new NpcData(npcName, location);
+        NpcData data = createNpcData(npcName, goalId, location);
         data.setDisplayName(npcName);
         data.setTurnToPlayer(true);
 
@@ -71,6 +74,57 @@ public class FancyNpcManager {
         saveNPCs();
 
         return new GoalNPC(npc, goalId, location);
+    }
+
+    public void setCentralNpc(String npcName, Location location) {
+        if (!canCreateNPCs()) {
+            throw new IllegalStateException("FancyNpcs plugin is not available");
+        }
+        if (location == null) {
+            throw new IllegalArgumentException("NPC location is required");
+        }
+
+        if (centralNpc != null) {
+            deleteCentralNpc();
+        }
+
+        NpcManager npcManager = getNpcManager();
+        if (npcManager.getNpc(npcName) != null) {
+            throw new IllegalArgumentException("NPC already exists: " + npcName);
+        }
+
+        NpcData data = createNpcData(npcName, CENTRAL_NPC_KEY, location);
+        data.setDisplayName(npcName);
+        data.setTurnToPlayer(true);
+
+        Npc npc = createNpcFromData(data);
+        npc.setSaveToFile(true);
+        npcManager.registerNpc(npc);
+        npc.create();
+        npc.spawnForAll();
+
+        centralNpc = new StoredNpc(npcName, CENTRAL_NPC_KEY, location);
+        saveNPCs();
+    }
+
+    public boolean deleteCentralNpc() {
+        if (centralNpc == null) {
+            return false;
+        }
+        String npcName = centralNpc.name;
+        centralNpc = null;
+
+        NpcManager npcManager = getNpcManager();
+        if (npcManager != null) {
+            Npc npc = npcManager.getNpc(npcName);
+            if (npc != null) {
+                npc.removeForAll();
+                npcManager.removeNpc(npc);
+            }
+            npcManager.saveNpcs(true);
+        }
+        saveNPCs();
+        return true;
     }
 
     /**
@@ -123,6 +177,35 @@ public class FancyNpcManager {
         return true;
     }
 
+    public int deleteNPCsForGoal(String goalId) {
+        List<String> toRemove = new ArrayList<>();
+        for (Map.Entry<String, StoredNpc> entry : npcByName.entrySet()) {
+            if (entry.getValue().goalId.equalsIgnoreCase(goalId)) {
+                toRemove.add(entry.getKey());
+            }
+        }
+        int removed = 0;
+        for (String key : toRemove) {
+            StoredNpc stored = npcByName.remove(key);
+            if (stored == null) {
+                continue;
+            }
+            removed++;
+            NpcManager npcManager = getNpcManager();
+            if (npcManager != null) {
+                Npc npc = npcManager.getNpc(stored.name);
+                if (npc != null) {
+                    npc.removeForAll();
+                    npcManager.removeNpc(npc);
+                }
+            }
+        }
+        if (removed > 0) {
+            saveNPCs();
+        }
+        return removed;
+    }
+
     /**
      * Check if FancyNpcs is available
      */
@@ -155,6 +238,17 @@ public class FancyNpcManager {
      */
     public int getNPCCount() {
         return npcByName.size();
+    }
+
+    public boolean isCentralNpc(String npcName) {
+        if (centralNpc == null) {
+            return false;
+        }
+        return normalizeName(centralNpc.name).equals(normalizeName(npcName));
+    }
+
+    public String getCentralNpcName() {
+        return centralNpc == null ? null : centralNpc.name;
     }
 
     /**
@@ -196,6 +290,17 @@ public class FancyNpcManager {
 
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("npcs", npcList);
+        if (centralNpc != null && centralNpc.location != null && centralNpc.location.getWorld() != null) {
+            Map<String, Object> central = new LinkedHashMap<>();
+            central.put("name", centralNpc.name);
+            central.put("world", centralNpc.location.getWorld().getName());
+            central.put("x", centralNpc.location.getX());
+            central.put("y", centralNpc.location.getY());
+            central.put("z", centralNpc.location.getZ());
+            central.put("yaw", centralNpc.location.getYaw());
+            central.put("pitch", centralNpc.location.getPitch());
+            root.put(CENTRAL_NPC_KEY, central);
+        }
 
         try (FileWriter writer = new FileWriter(storagePath.toFile())) {
             yaml.dump(root, writer);
@@ -214,6 +319,7 @@ public class FancyNpcManager {
      */
     public void reloadNPCs() {
         npcByName.clear();
+        centralNpc = null;
         loadNPCs();
 
         NpcManager npcManager = getNpcManager();
@@ -234,7 +340,7 @@ public class FancyNpcManager {
             }
             Object raw = data.get("npcs");
             if (!(raw instanceof List)) {
-                return;
+                raw = Collections.emptyList();
             }
 
             List<?> list = (List<?>) raw;
@@ -251,6 +357,17 @@ public class FancyNpcManager {
                 }
                 Location location = toLocation(entry);
                 npcByName.put(normalizeName(name), new StoredNpc(name, goalId, location));
+            }
+
+            Object centralRaw = data.get(CENTRAL_NPC_KEY);
+            if (centralRaw instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> centralEntry = (Map<String, Object>) centralRaw;
+                String name = asString(centralEntry.get("name"));
+                if (name != null) {
+                    Location location = toLocation(centralEntry);
+                    centralNpc = new StoredNpc(name, CENTRAL_NPC_KEY, location);
+                }
             }
         } catch (IOException e) {
             plugin.getLogger().warning("Failed to load NPCs: " + e.getMessage());
@@ -274,8 +391,19 @@ public class FancyNpcManager {
             if (stored.location == null) {
                 continue;
             }
-            NpcData data = new NpcData(stored.name, stored.location);
+            NpcData data = createNpcData(stored.name, stored.goalId, stored.location);
             data.setDisplayName(stored.name);
+            data.setTurnToPlayer(true);
+            Npc npc = createNpcFromData(data);
+            npc.setSaveToFile(true);
+            npcManager.registerNpc(npc);
+            npc.create();
+            npc.spawnForAll();
+        }
+
+        if (centralNpc != null && centralNpc.location != null && npcManager.getNpc(centralNpc.name) == null) {
+            NpcData data = createNpcData(centralNpc.name, CENTRAL_NPC_KEY, centralNpc.location);
+            data.setDisplayName(centralNpc.name);
             data.setTurnToPlayer(true);
             Npc npc = createNpcFromData(data);
             npc.setSaveToFile(true);
@@ -303,6 +431,13 @@ public class FancyNpcManager {
             throw new IllegalStateException("FancyNpcs API is not available");
         }
         return api.getNpcAdapter().apply(data);
+    }
+
+    private NpcData createNpcData(String npcName, String goalId, Location location) {
+        UUID uuid = UUID.nameUUIDFromBytes(
+            (goalId + ":" + npcName).getBytes(StandardCharsets.UTF_8)
+        );
+        return new NpcData(npcName, uuid, location);
     }
 
     private String normalizeName(String npcName) {

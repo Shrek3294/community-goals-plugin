@@ -23,7 +23,7 @@ repositories {
 
 dependencies {
     compileOnly 'io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT'
-    compileOnly 'de.oliver:FancyNpcs:2.0.0'
+    compileOnly files('server/plugins/FancyNpcs-2.9.1.jar')
     
     // YAML processing
     implementation 'org.yaml:snakeyaml:2.0'

@@ -299,6 +299,9 @@ public class GoalPlayerCommand extends BaseCommand {
         sender.sendMessage("§7Description: " + goal.getDescription());
         sender.sendMessage("§7Progress: " + goal.getCurrentProgress() + " / " + goal.getTargetProgress());
         sender.sendMessage(String.format("§7Completion: §a%.1f%%", goal.getProgressPercentage()));
+        if (goal.getRewardExpansion() > 0) {
+            sender.sendMessage("§7Reward Expansion: §f" + goal.getRewardExpansion() + " blocks");
+        }
         sender.sendMessage("§7Status: " + goal.getState().getColoredName());
         sender.sendMessage("");
     }

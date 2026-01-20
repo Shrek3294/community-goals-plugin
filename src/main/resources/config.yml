@@ -17,6 +17,9 @@ goals:
   # Default target progress for new goals
   default-target: 100
 
+  # Enable goal queue mode (only one active goal at a time)
+  queue-enabled: false
+
 # World border configuration
 world-border:
   # Enabled or disabled
