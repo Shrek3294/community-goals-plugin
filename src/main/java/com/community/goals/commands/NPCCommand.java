@@ -135,26 +135,25 @@ public class NPCCommand extends BaseCommand {
         }
 
         var allNpcs = npcManager.getAllNPCs();
-        String centralName = npcManager.getCentralNpcName();
-        boolean hasCentral = centralName != null;
-        if (allNpcs.isEmpty() && !hasCentral) {
+        var centralNpcs = npcManager.getCentralNpcNames();
+        if (allNpcs.isEmpty() && centralNpcs.isEmpty()) {
             sendError(sender, "No NPCs are currently linked to goals.");
             return true;
         }
 
         sender.sendMessage("");
-        sender.sendMessage("§6§l=== Linked NPCs ===");
-        sender.sendMessage("§7Total: §e" + allNpcs.size());
+        sender.sendMessage("?6?l=== Linked NPCs ===");
+        sender.sendMessage("?7Total: ?e" + allNpcs.size());
         sender.sendMessage("");
 
         int index = 1;
-        if (hasCentral) {
-            sender.sendMessage("§7" + index + ". §b[Central] §e" + centralName);
+        for (var entry : centralNpcs.entrySet()) {
+            sender.sendMessage("?7" + index + ". ?b[Central] ?e" + entry.getValue() + " ?7(" + entry.getKey() + ")");
             index++;
         }
         for (var npc : allNpcs) {
             String npcLabel = npc.getName() != null ? npc.getName() : "(missing)";
-            sender.sendMessage("§7" + index + ". §e" + npcLabel + " §7-> §f" + npc.getGoalId());
+            sender.sendMessage("?7" + index + ". ?e" + npcLabel + " ?7-> ?f" + npc.getGoalId());
             index++;
         }
 
@@ -171,14 +170,14 @@ public class NPCCommand extends BaseCommand {
         sender.sendMessage("§7/goal-npc link <npc_name> <goal_id> - Link NPC to goal");
         sender.sendMessage("§7/goal-npc unlink <npc_name> - Unlink NPC from goal");
         sender.sendMessage("§7/goal-npc list - List all linked NPCs");
-        sender.sendMessage("§7/goal-npc central set <npc_name> - Create central goals NPC");
-        sender.sendMessage("§7/goal-npc central remove - Remove central goals NPC");
+        sender.sendMessage("§7/goal-npc central set <npc_name> - Create central goals NPC in your world");
+        sender.sendMessage("§7/goal-npc central remove [world] - Remove central goals NPC");
         sender.sendMessage("");
     }
 
     private boolean handleCentral(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sendError(sender, "Usage: /goal-npc central <set|remove> [npc_name]");
+            sendError(sender, "Usage: /goal-npc central <set|remove> [npc_name|world]");
             return true;
         }
 
@@ -196,7 +195,7 @@ public class NPCCommand extends BaseCommand {
                 String npcName = args[2];
                 try {
                     npcManager.setCentralNpc(npcName, ((Player) sender).getLocation());
-                    sendSuccess(sender, "§aCreated central NPC §e" + npcName);
+                    sendSuccess(sender, "?aCreated central NPC ?e" + npcName);
                     npcManager.saveNPCs();
                     return true;
                 } catch (Exception e) {
@@ -204,14 +203,24 @@ public class NPCCommand extends BaseCommand {
                     return true;
                 }
             case "remove":
-                if (npcManager.deleteCentralNpc()) {
-                    sendSuccess(sender, "§aRemoved central NPC.");
+                String worldName = null;
+                if (args.length >= 3) {
+                    worldName = args[2];
+                } else if (sender instanceof Player) {
+                    worldName = ((Player) sender).getWorld().getName();
+                }
+                if (worldName == null) {
+                    sendError(sender, "Usage: /goal-npc central remove [world]");
+                    return true;
+                }
+                if (npcManager.deleteCentralNpc(worldName)) {
+                    sendSuccess(sender, "?aRemoved central NPC for " + worldName + ".");
                 } else {
-                    sendError(sender, "No central NPC is configured.");
+                    sendError(sender, "No central NPC is configured for " + worldName + ".");
                 }
                 return true;
             default:
-                sendError(sender, "Usage: /goal-npc central <set|remove> [npc_name]");
+                sendError(sender, "Usage: /goal-npc central <set|remove> [npc_name|world]");
                 return true;
         }
     }

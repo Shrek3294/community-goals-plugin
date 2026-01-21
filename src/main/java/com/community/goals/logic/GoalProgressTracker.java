@@ -33,12 +33,12 @@ public class GoalProgressTracker {
     /**
      * Create a new goal
      */
-    public Goal createGoal(String id, String name, String description, long targetProgress) {
+    public Goal createGoal(String id, String name, String description, long targetProgress, String worldName) {
         if (goals.containsKey(id)) {
             throw new IllegalArgumentException("Goal with id '" + id + "' already exists");
         }
 
-        Goal goal = new Goal(id, name, description, targetProgress);
+        Goal goal = new Goal(id, name, description, targetProgress, worldName);
         goals.put(id, goal);
         persistenceManager.saveGoal(goal);
         notifyGoalCreated(goal);
@@ -59,6 +59,19 @@ public class GoalProgressTracker {
         return Collections.unmodifiableCollection(goals.values());
     }
 
+    public Collection<Goal> getGoalsForWorld(String worldName) {
+        List<Goal> result = new ArrayList<>();
+        if (worldName == null) {
+            return result;
+        }
+        for (Goal goal : goals.values()) {
+            if (worldName.equalsIgnoreCase(goal.getWorldName())) {
+                result.add(goal);
+            }
+        }
+        return result;
+    }
+
     /**
      * Get active goals only
      */
@@ -66,6 +79,19 @@ public class GoalProgressTracker {
         List<Goal> activeGoals = new ArrayList<>();
         for (Goal goal : goals.values()) {
             if (!goal.isCompleted()) {
+                activeGoals.add(goal);
+            }
+        }
+        return activeGoals;
+    }
+
+    public List<Goal> getActiveGoalsForWorld(String worldName) {
+        List<Goal> activeGoals = new ArrayList<>();
+        if (worldName == null) {
+            return activeGoals;
+        }
+        for (Goal goal : goals.values()) {
+            if (!goal.isCompleted() && worldName.equalsIgnoreCase(goal.getWorldName())) {
                 activeGoals.add(goal);
             }
         }

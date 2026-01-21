@@ -2,6 +2,7 @@ package com.community.goals;
 
 import com.community.goals.commands.*;
 import com.community.goals.features.BorderExpansionManager;
+import com.community.goals.features.BorderManagerRegistry;
 import com.community.goals.features.ProgressAnnouncementManager;
 import com.community.goals.gui.GoalGuiManager;
 import com.community.goals.logic.GoalProgressTracker;
@@ -23,7 +24,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     private GoalProgressTracker goalProgressTracker;
     private PersistenceManager persistenceManager;
     private ConfigManager configManager;
-    private BorderExpansionManager borderExpansionManager;
+    private BorderManagerRegistry borderRegistry;
     private ProgressAnnouncementManager announcementManager;
     private FancyNpcManager npcManager;
     private NPCInteractionHandler npcInteractionHandler;
@@ -46,30 +47,24 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             String configPath = Paths.get(getDataFolder().getAbsolutePath(), "config.yml").toString();
             configManager = new ConfigManager(configPath, getLogger());
 
+            // Initialize border managers
+            borderRegistry = BorderManagerRegistry.fromConfig(configManager, getLogger());
+
             // Initialize persistence
             String dataPath = Paths.get(getDataFolder().getAbsolutePath(), "data").toString();
-            persistenceManager = new PersistenceManager(dataPath, getLogger());
+            persistenceManager = new PersistenceManager(dataPath, getLogger(), borderRegistry.getDefaultWorld());
 
             // Initialize core logic
             goalProgressTracker = new GoalProgressTracker(persistenceManager);
             turnInHandler = new TurnInHandler(goalProgressTracker);
             goalGuiManager = new GoalGuiManager(goalProgressTracker, turnInHandler);
             boolean queueEnabled = configManager.getBoolean("goals.queue-enabled", false);
-            goalQueueManager = new GoalQueueManager(goalProgressTracker, persistenceManager, queueEnabled);
+            goalQueueManager = new GoalQueueManager(goalProgressTracker, persistenceManager, queueEnabled, borderRegistry.getDefaultWorld());
             
             // Register goal completion listener for border expansion and announcements
             goalProgressTracker.addListener(new GoalCompletionHandler());
 
             // Initialize features
-            String worldName = configManager.getString("world-border.world", "world");
-            long centerX = configManager.getLong("world-border.center-x", 0L);
-            long centerZ = configManager.getLong("world-border.center-z", 0L);
-            long initialSize = configManager.getLong("world-border.initial-size", 500L);
-            long expansionAmount = configManager.getLong("world-border.expansion-amount", 100L);
-
-            Border borderConfig = new Border(worldName, centerX, centerZ, initialSize, expansionAmount);
-            borderExpansionManager = new BorderExpansionManager(borderConfig, getLogger());
-
             announcementManager = new ProgressAnnouncementManager();
 
             // Initialize NPC system
@@ -117,7 +112,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
         getCommand("goal").setExecutor(playerCommand);
 
         // Admin commands
-        GoalAdminCommand adminCommand = new GoalAdminCommand(goalProgressTracker, persistenceManager, borderExpansionManager, configManager, goalQueueManager, getLogger());
+        GoalAdminCommand adminCommand = new GoalAdminCommand(goalProgressTracker, persistenceManager, borderRegistry, configManager, goalQueueManager, getLogger());
         getCommand("goal-admin").setExecutor(adminCommand);
 
         // NPC commands
@@ -144,8 +139,8 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     /**
      * Get the border expansion manager
      */
-    public BorderExpansionManager getBorderExpansionManager() {
-        return borderExpansionManager;
+    public BorderManagerRegistry getBorderRegistry() {
+        return borderRegistry;
     }
 
     /**
@@ -183,33 +178,37 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             // Broadcast server-wide message
             String message = String.format("§6§l[Community Goals] §a%s completed! §7Expanding world border...", goal.getName());
             getServer().broadcastMessage(message);
-            
-            // Get border info before expansion
-            BorderExpansionManager.BorderInfo beforeInfo = borderExpansionManager.getInfo();
-            getLogger().info("Border before expansion: " + beforeInfo.currentSize);
-            
-            double expansionAmount = goal.getRewardExpansion() > 0
-                ? goal.getRewardExpansion()
-                : borderExpansionManager.getBorderConfig().getExpansionAmount();
-
-            // Expand the border
-            if (borderExpansionManager.expandBorder(expansionAmount)) {
-                BorderExpansionManager.BorderInfo afterInfo = borderExpansionManager.getInfo();
-                getLogger().info("Border after expansion: " + afterInfo.currentSize);
-                
-                String borderMessage = String.format("§6§l[Community Goals] §7World border expanded to §f%.0f blocks§7!", afterInfo.currentSize);
-                getServer().broadcastMessage(borderMessage);
-                
-                // Save border configuration
-                saveBorderConfig();
-                getLogger().info("Border configuration saved to config file");
+            BorderExpansionManager borderManager = borderRegistry.getManager(goal.getWorldName());
+            if (borderManager == null) {
+                getServer().broadcastMessage("AcAl[Community Goals] A7No border configured for world: " + goal.getWorldName());
             } else {
-                getServer().broadcastMessage("§c§l[Community Goals] §7Failed to expand world border!");
+                BorderExpansionManager.BorderInfo beforeInfo = borderManager.getInfo();
+                getLogger().info("Border before expansion: " + beforeInfo.currentSize);
+
+                double expansionAmount = goal.getRewardExpansion() > 0
+                    ? goal.getRewardExpansion()
+                    : borderManager.getBorderConfig().getExpansionAmount();
+
+                if (borderManager.expandBorder(expansionAmount)) {
+                    BorderExpansionManager.BorderInfo afterInfo = borderManager.getInfo();
+                    getLogger().info("Border after expansion: " + afterInfo.currentSize);
+
+                    String borderMessage = String.format(
+                        "A6Al[Community Goals] A7World border expanded to Af%.0f blocksA7!",
+                        afterInfo.currentSize
+                    );
+                    getServer().broadcastMessage(borderMessage);
+
+                    saveBorderConfig(goal.getWorldName());
+                    getLogger().info("Border configuration saved to config file");
+                } else {
+                    getServer().broadcastMessage("AcAl[Community Goals] A7Failed to expand world border!");
+                }
             }
 
             npcManager.deleteNPCsForGoal(goal.getId());
             if (goalQueueManager != null && goalQueueManager.isEnabled()) {
-                goalQueueManager.handleGoalCompleted(goal.getId());
+                goalQueueManager.handleGoalCompleted(goal);
             }
             goalProgressTracker.deleteGoal(goal.getId());
             goalGuiManager.refreshOpenGoalsMenus();
@@ -243,13 +242,9 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     /**
      * Save current border configuration to config
      */
-    private void saveBorderConfig() {
+    private void saveBorderConfig(String worldName) {
         try {
-            BorderExpansionManager.BorderInfo info = borderExpansionManager.getInfo();
-            configManager.set("world-border.center-x", info.centerX);
-            configManager.set("world-border.center-z", info.centerZ);
-            configManager.set("world-border.initial-size", info.currentSize);
-            configManager.saveConfig();
+            borderRegistry.saveBorderConfig(configManager, worldName);
         } catch (Exception e) {
             getLogger().warning("Failed to save border configuration: " + e.getMessage());
         }

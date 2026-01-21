@@ -38,8 +38,12 @@ public class GoalGuiManager implements Listener {
     }
 
     public void openGoalsMenu(Player player) {
-        List<Goal> goals = getDisplayGoals();
-        GoalsMenuHolder holder = new GoalsMenuHolder();
+        openGoalsMenu(player, player.getWorld().getName());
+    }
+
+    public void openGoalsMenu(Player player, String worldName) {
+        List<Goal> goals = getDisplayGoals(worldName);
+        GoalsMenuHolder holder = new GoalsMenuHolder(worldName);
         Inventory inventory = Bukkit.createInventory(holder, 27, GOALS_TITLE);
         holder.setInventory(inventory);
 
@@ -79,7 +83,7 @@ public class GoalGuiManager implements Listener {
         inventory.clear();
         holder.clearSlots();
 
-        List<Goal> goals = getDisplayGoals();
+        List<Goal> goals = getDisplayGoals(holder.getWorldName());
         for (int i = 0; i < GOAL_SLOTS.length; i++) {
             if (i >= goals.size()) {
                 continue;
@@ -284,6 +288,10 @@ public class GoalGuiManager implements Listener {
 
     private Material resolveMaterialForGoal(String goalId) {
         String id = goalId.toLowerCase(Locale.ROOT);
+        Material direct = Material.matchMaterial(goalId.toUpperCase(Locale.ROOT));
+        if (direct != null) {
+            return direct;
+        }
 
         if (id.contains("diamond")) return Material.DIAMOND;
         if (id.contains("iron")) return Material.IRON_INGOT;
@@ -300,13 +308,20 @@ public class GoalGuiManager implements Listener {
         if (id.contains("pork")) return Material.PORKCHOP;
         if (id.contains("chicken")) return Material.CHICKEN;
         if (id.contains("fish")) return Material.COD;
+        if (id.contains("leather") || id.contains("hide")) return Material.LEATHER;
         if (id.contains("netherite")) return Material.NETHERITE_INGOT;
+        if (id.contains("blaze")) return Material.BLAZE_ROD;
+        if (id.contains("wart")) return Material.NETHER_WART;
+        if (id.contains("ghast")) return Material.GHAST_TEAR;
+        if (id.contains("ancient") || id.contains("debris")) return Material.ANCIENT_DEBRIS;
+        if (id.contains("quartz")) return Material.NETHER_QUARTZ;
+        if (id.contains("magma")) return Material.MAGMA_CREAM;
 
         return null;
     }
 
-    private List<Goal> getDisplayGoals() {
-        List<Goal> all = new ArrayList<>(tracker.getAllGoals());
+    private List<Goal> getDisplayGoals(String worldName) {
+        List<Goal> all = new ArrayList<>(tracker.getGoalsForWorld(worldName));
         all.removeIf(goal -> goal.getState() == State.COMPLETED);
         all.sort(Comparator
             .comparing((Goal goal) -> goal.getState() != State.ACTIVE)
@@ -326,6 +341,7 @@ public class GoalGuiManager implements Listener {
             meta.setDisplayName((locked ? "§cLocked: " : "§a") + goal.getName());
             List<String> lore = new ArrayList<>();
             lore.add("§7" + goal.getDescription());
+            lore.add("§7World: §f" + goal.getWorldName());
             lore.add("§7Progress: §f" + goal.getCurrentProgress() + " / " + goal.getTargetProgress());
             lore.add(String.format("§7Completion: §a%.1f%%", goal.getProgressPercentage()));
             if (goal.getRewardExpansion() > 0) {
@@ -346,7 +362,12 @@ public class GoalGuiManager implements Listener {
 
     private static class GoalsMenuHolder implements InventoryHolder {
         private final Map<Integer, String> slotToGoalId = new HashMap<>();
+        private final String worldName;
         private Inventory inventory;
+
+        private GoalsMenuHolder(String worldName) {
+            this.worldName = worldName;
+        }
 
         @Override
         public Inventory getInventory() {
@@ -367,6 +388,10 @@ public class GoalGuiManager implements Listener {
 
         public void clearSlots() {
             slotToGoalId.clear();
+        }
+
+        public String getWorldName() {
+            return worldName;
         }
     }
 

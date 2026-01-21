@@ -20,11 +20,13 @@ public class PersistenceManager {
     private final String goalsFile = "goals.yml";
     private final String queueFile = "goal-queue.yml";
     private final Logger logger;
+    private final String defaultWorldName;
 
-    public PersistenceManager(String dataFolderPath, Logger logger) {
+    public PersistenceManager(String dataFolderPath, Logger logger, String defaultWorldName) {
         this.dataFolder = Paths.get(dataFolderPath);
         this.yaml = new Yaml();
         this.logger = logger;
+        this.defaultWorldName = defaultWorldName;
         
         try {
             Files.createDirectories(dataFolder);
@@ -124,6 +126,7 @@ public class PersistenceManager {
         map.put("id", goal.getId());
         map.put("name", goal.getName());
         map.put("description", goal.getDescription());
+        map.put("world", goal.getWorldName());
         map.put("current-progress", goal.getCurrentProgress());
         map.put("target-progress", goal.getTargetProgress());
         map.put("reward-expansion", goal.getRewardExpansion());
@@ -142,8 +145,9 @@ public class PersistenceManager {
             String name = (String) map.get("name");
             String description = (String) map.get("description");
             long targetProgress = ((Number) map.get("target-progress")).longValue();
+            String worldName = map.containsKey("world") ? String.valueOf(map.get("world")) : defaultWorldName;
 
-            Goal goal = new Goal(id, name, description, targetProgress);
+            Goal goal = new Goal(id, name, description, targetProgress, worldName);
             
             Long currentProgress = ((Number) map.get("current-progress")).longValue();
             if (currentProgress > 0) {
@@ -178,16 +182,9 @@ public class PersistenceManager {
      * Save goal queue to YAML file
      */
     public void saveGoalQueue(List<String> queue) {
-        Map<String, Object> root = new LinkedHashMap<>();
-        root.put("queue", new ArrayList<>(queue));
-        root.put("last-updated", System.currentTimeMillis());
-
-        Path filePath = dataFolder.resolve(queueFile);
-        try (FileWriter writer = new FileWriter(filePath.toFile())) {
-            yaml.dump(root, writer);
-        } catch (IOException e) {
-            logger.warning("Failed to save goal queue: " + e.getMessage());
-        }
+        Map<String, List<String>> queues = new LinkedHashMap<>();
+        queues.put(defaultWorldName, new ArrayList<>(queue));
+        saveGoalQueues(queues);
     }
 
     /**
@@ -195,31 +192,84 @@ public class PersistenceManager {
      */
     @SuppressWarnings("unchecked")
     public List<String> loadGoalQueue() {
-        List<String> queue = new ArrayList<>();
+        Map<String, List<String>> queues = loadGoalQueues(defaultWorldName);
+        List<String> queue = queues.get(defaultWorldName);
+        if (queue == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(queue);
+    }
+
+    /**
+     * Save per-world goal queues to YAML file
+     */
+    public void saveGoalQueues(Map<String, List<String>> queues) {
+        Map<String, Object> root = new LinkedHashMap<>();
+        Map<String, Object> queueMap = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : queues.entrySet()) {
+            queueMap.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        root.put("queues", queueMap);
+        root.put("last-updated", System.currentTimeMillis());
+
+        Path filePath = dataFolder.resolve(queueFile);
+        try (FileWriter writer = new FileWriter(filePath.toFile())) {
+            yaml.dump(root, writer);
+        } catch (IOException e) {
+            logger.warning("Failed to save goal queues: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Load per-world goal queues from YAML file
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, List<String>> loadGoalQueues(String defaultWorld) {
+        Map<String, List<String>> queues = new LinkedHashMap<>();
         Path filePath = dataFolder.resolve(queueFile);
         if (!Files.exists(filePath)) {
-            return queue;
+            return queues;
         }
 
         try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
             Map<String, Object> data = yaml.load(fis);
             if (data == null) {
-                return queue;
+                return queues;
             }
-            Object raw = data.get("queue");
-            if (!(raw instanceof List)) {
-                return queue;
-            }
-            for (Object entry : (List<?>) raw) {
-                if (entry != null) {
-                    queue.add(String.valueOf(entry));
+
+            Object rawQueues = data.get("queues");
+            if (rawQueues instanceof Map) {
+                Map<String, Object> rawMap = (Map<String, Object>) rawQueues;
+                for (Map.Entry<String, Object> entry : rawMap.entrySet()) {
+                    List<String> queue = new ArrayList<>();
+                    Object list = entry.getValue();
+                    if (list instanceof List) {
+                        for (Object item : (List<?>) list) {
+                            if (item != null) {
+                                queue.add(String.valueOf(item));
+                            }
+                        }
+                    }
+                    queues.put(entry.getKey(), queue);
                 }
+                return queues;
+            }
+
+            Object rawQueue = data.get("queue");
+            if (rawQueue instanceof List) {
+                List<String> queue = new ArrayList<>();
+                for (Object item : (List<?>) rawQueue) {
+                    if (item != null) {
+                        queue.add(String.valueOf(item));
+                    }
+                }
+                queues.put(defaultWorld, queue);
             }
         } catch (IOException e) {
-            logger.warning("Failed to load goal queue: " + e.getMessage());
+            logger.warning("Failed to load goal queues: " + e.getMessage());
         }
 
-        return queue;
+        return queues;
     }
 
     /**

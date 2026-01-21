@@ -7,6 +7,7 @@ public class Goal {
     private final String id;
     private final String name;
     private final String description;
+    private final String worldName;
     private long currentProgress;
     private long targetProgress;
     private double rewardExpansion;
@@ -14,11 +15,12 @@ public class Goal {
     private long createdAt;
     private long completedAt;
 
-    public Goal(String id, String name, String description, long targetProgress) {
+    public Goal(String id, String name, String description, long targetProgress, String worldName) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.targetProgress = targetProgress;
+        this.worldName = worldName;
         this.currentProgress = 0;
         this.state = State.ACTIVE;
         this.createdAt = System.currentTimeMillis();
@@ -36,6 +38,10 @@ public class Goal {
 
     public String getDescription() {
         return description;
+    }
+
+    public String getWorldName() {
+        return worldName;
     }
 
     public long getCurrentProgress() {
@@ -101,6 +107,7 @@ public class Goal {
         return "Goal{" +
                 "id='" + id + '\'' +
                 ", name='" + name + '\'' +
+                ", worldName='" + worldName + '\'' +
                 ", currentProgress=" + currentProgress +
                 ", targetProgress=" + targetProgress +
                 ", rewardExpansion=" + rewardExpansion +

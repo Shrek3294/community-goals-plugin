@@ -3,12 +3,14 @@ package com.community.goals.commands;
 import com.community.goals.Goal;
 import com.community.goals.State;
 import com.community.goals.features.BorderExpansionManager;
+import com.community.goals.features.BorderManagerRegistry;
 import com.community.goals.logic.GoalProgressTracker;
 import com.community.goals.logic.GoalQueueManager;
 import com.community.goals.persistence.ConfigManager;
 import com.community.goals.persistence.PersistenceManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 import java.util.Collection;
 import java.util.logging.Logger;
@@ -17,14 +19,14 @@ import java.util.logging.Logger;
  * Handles /goal admin commands
  */
 public class GoalAdminCommand extends BaseCommand {
-    private final BorderExpansionManager borderManager;
+    private final BorderManagerRegistry borderRegistry;
     private final ConfigManager configManager;
     private final GoalQueueManager queueManager;
     private final Logger logger;
     
-    public GoalAdminCommand(GoalProgressTracker tracker, PersistenceManager persistence, BorderExpansionManager borderManager, ConfigManager configManager, GoalQueueManager queueManager, Logger logger) {
+    public GoalAdminCommand(GoalProgressTracker tracker, PersistenceManager persistence, BorderManagerRegistry borderRegistry, ConfigManager configManager, GoalQueueManager queueManager, Logger logger) {
         super(tracker, persistence);
-        this.borderManager = borderManager;
+        this.borderRegistry = borderRegistry;
         this.configManager = configManager;
         this.queueManager = queueManager;
         this.logger = logger;
@@ -76,8 +78,8 @@ public class GoalAdminCommand extends BaseCommand {
 
     private boolean handleCreate(CommandSender sender, String[] args) {
         if (args.length < 4) {
-            sendError(sender, "Usage: /goal admin create <id> <name> <target> [reward] [description]");
-            sendInfo(sender, "Example: /goal admin create diamonds \"Diamond Collection\" 10 200 \"Collect diamonds\"");
+            sendError(sender, "Usage: /goal admin create <id> <name> <target> [reward] [world] [description]");
+            sendInfo(sender, "Example: /goal admin create diamonds \"Diamond Collection\" 10 200 world \"Collect diamonds\"");
             return true;
         }
 
@@ -85,8 +87,8 @@ public class GoalAdminCommand extends BaseCommand {
         String[] parsedArgs = parseQuotedArgs(args);
         
         if (parsedArgs.length < 4) {
-            sendError(sender, "Usage: /goal admin create <id> <name> <target> [reward] [description]");
-            sendInfo(sender, "Example: /goal admin create diamonds \"Diamond Collection\" 10 200 \"Collect diamonds\"");
+            sendError(sender, "Usage: /goal admin create <id> <name> <target> [reward] [world] [description]");
+            sendInfo(sender, "Example: /goal admin create diamonds \"Diamond Collection\" 10 200 world \"Collect diamonds\"");
             return true;
         }
 
@@ -116,10 +118,19 @@ public class GoalAdminCommand extends BaseCommand {
             }
         }
 
+        String worldName = resolveDefaultWorld(sender);
+        if (parsedArgs.length > descriptionIndex) {
+            String worldCandidate = resolveWorldName(parsedArgs[descriptionIndex]);
+            if (worldCandidate != null) {
+                worldName = worldCandidate;
+                descriptionIndex++;
+            }
+        }
+
         String description = parsedArgs.length > descriptionIndex ? parsedArgs[descriptionIndex] : "No description";
 
         try {
-            Goal goal = tracker.createGoal(id, name, description, target);
+            Goal goal = tracker.createGoal(id, name, description, target, worldName);
             if (rewardExpansion > 0) {
                 goal.setRewardExpansion(rewardExpansion);
                 persistence.saveGoal(goal);
@@ -147,7 +158,7 @@ public class GoalAdminCommand extends BaseCommand {
 
         tracker.deleteGoal(goalId);
         if (queueManager != null && queueManager.isEnabled()) {
-            queueManager.handleGoalDeleted(goalId);
+            queueManager.handleGoalDeleted(goal);
         }
         sendSuccess(sender, "Goal deleted: " + goal.getName());
         return true;
@@ -168,6 +179,7 @@ public class GoalAdminCommand extends BaseCommand {
         sender.sendMessage("§7ID: §f" + goal.getId());
         sender.sendMessage("§7Name: §f" + goal.getName());
         sender.sendMessage("§7Description: §f" + goal.getDescription());
+        sender.sendMessage("§7World: §f" + goal.getWorldName());
         sender.sendMessage("§7Progress: §f" + goal.getCurrentProgress() + " / " + goal.getTargetProgress());
         sender.sendMessage(String.format("§7Percentage: §f%.2f%%", goal.getProgressPercentage()));
         if (goal.getRewardExpansion() > 0) {
@@ -194,11 +206,13 @@ public class GoalAdminCommand extends BaseCommand {
             String status = goal.isCompleted() ? "§a✓" : "§7○";
             String progressBar = createProgressBar(goal.getProgressPercentage());
             String rewardLabel = goal.getRewardExpansion() > 0 ? String.format(" §7(+%.0f)", goal.getRewardExpansion()) : "";
+            String worldLabel = " §7(" + goal.getWorldName() + ")";
             sender.sendMessage(String.format(
-                "%s §f%s%s §7[%s] %.1f%%",
+                "%s §f%s%s%s §7[%s] %.1f%%",
                 status,
                 goal.getName(),
                 rewardLabel,
+                worldLabel,
                 progressBar,
                 goal.getProgressPercentage()
             ));
@@ -271,7 +285,7 @@ public class GoalAdminCommand extends BaseCommand {
                 sendSuccess(sender, "State set to " + state.getDisplayName() + " for " + goal.getName());
             }
             if (queueManager != null && queueManager.isEnabled()) {
-                queueManager.refreshStates();
+                queueManager.refreshStates(goal.getWorldName());
             }
             return true;
         } catch (IllegalArgumentException e) {
@@ -319,28 +333,46 @@ public class GoalAdminCommand extends BaseCommand {
 
     private boolean handleBorder(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage("§6§l=== Border Commands ===");
-            sender.sendMessage("§7/goal admin border info - Show border information");
-            sender.sendMessage("§7/goal admin border set <size> - Set border size");
-            sender.sendMessage("§7/goal admin border expand [amount] - Expand border");
-            sender.sendMessage("§7/goal admin border center <x> <z> - Set border center");
+            sender.sendMessage("?6?l=== Border Commands ===");
+            sender.sendMessage("?7/goal admin border [world] info - Show border information");
+            sender.sendMessage("?7/goal admin border [world] set <size> - Set border size");
+            sender.sendMessage("?7/goal admin border [world] expand [amount] - Expand border");
+            sender.sendMessage("?7/goal admin border [world] center <x> <z> - Set border center");
             return true;
         }
 
+        String worldName = resolveDefaultWorld(sender);
         String borderCmd = args[1].toLowerCase();
-        
+        int cmdIndex = 1;
+
+        if (!isBorderSubcommand(borderCmd)) {
+            worldName = args[1];
+            if (args.length < 3) {
+                sendError(sender, "Usage: /goal admin border <world> <info|set|expand|center>");
+                return true;
+            }
+            borderCmd = args[2].toLowerCase();
+            cmdIndex = 2;
+        }
+
+        BorderExpansionManager borderManager = borderRegistry.getManager(worldName);
+        if (borderManager == null) {
+            sendError(sender, "No border configured for world: " + worldName);
+            return true;
+        }
+
         switch (borderCmd) {
             case "info":
-                return handleBorderInfo(sender);
+                return handleBorderInfo(sender, borderManager);
             case "set":
-                return handleBorderSet(sender, args);
+                return handleBorderSet(sender, borderManager, args, cmdIndex + 1, worldName);
             case "expand":
-                return handleBorderExpand(sender, args);
+                return handleBorderExpand(sender, borderManager, args, cmdIndex + 1, worldName);
             case "center":
-                return handleBorderCenter(sender, args);
+                return handleBorderCenter(sender, borderManager, args, cmdIndex + 1, worldName);
             default:
                 sendError(sender, "Unknown border command: " + borderCmd);
-                return handleBorder(sender, new String[]{"border"});
+                return true;
         }
     }
 
@@ -355,30 +387,49 @@ public class GoalAdminCommand extends BaseCommand {
             return true;
         }
 
+        String worldName = resolveDefaultWorld(sender);
         String action = args[1].toLowerCase();
+        int actionIndex = 1;
+
+        if (!isQueueAction(action)) {
+            worldName = args[1];
+            if (args.length < 3) {
+                sendQueueUsage(sender);
+                return true;
+            }
+            action = args[2].toLowerCase();
+            actionIndex = 2;
+        }
+
+        if (!borderRegistry.hasWorld(worldName)) {
+            sendError(sender, "No border configured for world: " + worldName);
+            return true;
+        }
+
         switch (action) {
             case "list":
-                return handleQueueList(sender);
+                return handleQueueList(sender, worldName);
             case "add":
-                return handleQueueAdd(sender, args);
+                return handleQueueAdd(sender, args, actionIndex + 1, worldName);
             case "remove":
-                return handleQueueRemove(sender, args);
+                return handleQueueRemove(sender, args, actionIndex + 1, worldName);
             case "move":
-                return handleQueueMove(sender, args);
+                return handleQueueMove(sender, args, actionIndex + 1, worldName);
             case "next":
-                return handleQueueNext(sender);
+                return handleQueueNext(sender, args, actionIndex + 1, worldName);
             default:
                 sendQueueUsage(sender);
                 return true;
         }
     }
 
-    private boolean handleQueueList(CommandSender sender) {
-        var queue = queueManager.getQueue();
+    private boolean handleQueueList(CommandSender sender, String worldName) {
+        var queue = queueManager.getQueue(worldName);
         sender.sendMessage("");
-        sender.sendMessage("§6§l=== Goal Queue ===");
+        sender.sendMessage("?6?l=== Goal Queue ===");
+        sender.sendMessage("?7World: ?f" + worldName);
         if (queue.isEmpty()) {
-            sender.sendMessage("§7No goals in queue.");
+            sender.sendMessage("?7No goals in queue.");
             sender.sendMessage("");
             return true;
         }
@@ -389,58 +440,71 @@ public class GoalAdminCommand extends BaseCommand {
             if (goal == null) {
                 continue;
             }
-            String marker = index == 1 ? "§a[ACTIVE]" : "§7[QUEUED]";
-            sender.sendMessage("§7" + index + ". " + marker + " §f" + goal.getName() + " §7(" + goal.getId() + ")");
+            String marker = index == 1 ? "?a[ACTIVE]" : "?7[QUEUED]";
+            sender.sendMessage("?7" + index + ". " + marker + " ?f" + goal.getName() + " ?7(" + goal.getId() + ")");
             index++;
         }
         sender.sendMessage("");
         return true;
     }
 
-    private boolean handleQueueAdd(CommandSender sender, String[] args) {
-        if (args.length < 3) {
-            sendError(sender, "Usage: /goal admin queue add <id>");
+    private boolean handleQueueAdd(CommandSender sender, String[] args, int idIndex, String worldName) {
+        if (args.length <= idIndex) {
+            sendError(sender, "Usage: /goal admin queue [world] add <id>");
             return true;
         }
-        String goalId = args[2];
+        String goalId = args[idIndex];
         Goal goal = getGoalOrError(sender, goalId);
         if (goal == null) {
             return true;
         }
-        queueManager.addToQueue(goalId);
+        if (!goal.getWorldName().equalsIgnoreCase(worldName)) {
+            sendError(sender, "Goal belongs to world " + goal.getWorldName() + ", not " + worldName);
+            return true;
+        }
+        queueManager.addToQueue(worldName, goalId);
         sendSuccess(sender, "Added goal to queue: " + goal.getName());
         return true;
     }
 
-    private boolean handleQueueRemove(CommandSender sender, String[] args) {
-        if (args.length < 3) {
-            sendError(sender, "Usage: /goal admin queue remove <id>");
+    private boolean handleQueueRemove(CommandSender sender, String[] args, int idIndex, String worldName) {
+        if (args.length <= idIndex) {
+            sendError(sender, "Usage: /goal admin queue [world] remove <id>");
             return true;
         }
-        String goalId = args[2];
+        String goalId = args[idIndex];
         Goal goal = getGoalOrError(sender, goalId);
         if (goal == null) {
             return true;
         }
-        queueManager.removeFromQueue(goalId);
+        if (!goal.getWorldName().equalsIgnoreCase(worldName)) {
+            sendError(sender, "Goal belongs to world " + goal.getWorldName() + ", not " + worldName);
+            return true;
+        }
+        queueManager.removeFromQueue(worldName, goalId);
         sendSuccess(sender, "Removed goal from queue: " + goal.getName());
         return true;
     }
 
-    private boolean handleQueueMove(CommandSender sender, String[] args) {
-        if (args.length < 4) {
-            sendError(sender, "Usage: /goal admin queue move <id> <position>");
+    private boolean handleQueueMove(CommandSender sender, String[] args, int idIndex, String worldName) {
+        if (args.length <= idIndex + 1) {
+            sendError(sender, "Usage: /goal admin queue [world] move <id|position> <position>");
             return true;
         }
-        String goalId = args[2];
+        var queue = queueManager.getQueue(worldName);
+        String goalId = resolveQueueGoalId(queue, args[idIndex]);
+        if (goalId == null) {
+            sendError(sender, "Goal not found in queue.");
+            return true;
+        }
         int position;
         try {
-            position = Integer.parseInt(args[3]);
+            position = Integer.parseInt(args[idIndex + 1]);
         } catch (NumberFormatException e) {
             sendError(sender, "Position must be a number.");
             return true;
         }
-        if (queueManager.moveInQueue(goalId, position - 1)) {
+        if (queueManager.moveInQueue(worldName, goalId, position - 1)) {
             sendSuccess(sender, "Moved goal in queue.");
         } else {
             sendError(sender, "Goal not found in queue.");
@@ -448,44 +512,75 @@ public class GoalAdminCommand extends BaseCommand {
         return true;
     }
 
-    private boolean handleQueueNext(CommandSender sender) {
-        queueManager.advanceToNextGoal();
-        sendSuccess(sender, "Queue updated. Next goal is now active.");
+    private boolean handleQueueNext(CommandSender sender, String[] args, int idIndex, String worldName) {
+        if (args.length <= idIndex) {
+            queueManager.advanceToNextGoal(worldName);
+            sendSuccess(sender, "Queue updated. Next goal is now active.");
+            return true;
+        }
+        var queue = queueManager.getQueue(worldName);
+        String goalId = resolveQueueGoalId(queue, args[idIndex]);
+        if (goalId == null) {
+            sendError(sender, "Goal not found in queue.");
+            return true;
+        }
+        if (queueManager.activateGoal(worldName, goalId)) {
+            sendSuccess(sender, "Queue updated. Selected goal is now active.");
+        } else {
+            sendError(sender, "Goal not found in queue.");
+        }
         return true;
+    }
+
+    private String resolveQueueGoalId(java.util.List<String> queue, String arg) {
+        for (String id : queue) {
+            if (id.equalsIgnoreCase(arg)) {
+                return id;
+            }
+        }
+        try {
+            int position = Integer.parseInt(arg);
+            if (position < 1 || position > queue.size()) {
+                return null;
+            }
+            return queue.get(position - 1);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private void sendQueueUsage(CommandSender sender) {
         sender.sendMessage("§6§l=== Queue Commands ===");
-        sender.sendMessage("§7/goal admin queue list - Show queued goals");
-        sender.sendMessage("§7/goal admin queue add <id> - Add goal to queue");
-        sender.sendMessage("§7/goal admin queue remove <id> - Remove goal from queue");
-        sender.sendMessage("§7/goal admin queue move <id> <position> - Move goal to position");
-        sender.sendMessage("§7/goal admin queue next - Activate next goal");
+        sender.sendMessage("§7/goal admin queue [world] list - Show queued goals");
+        sender.sendMessage("§7/goal admin queue [world] add <id> - Add goal to queue");
+        sender.sendMessage("§7/goal admin queue [world] remove <id> - Remove goal from queue");
+        sender.sendMessage("§7/goal admin queue [world] move <id|position> <position> - Move goal to position");
+        sender.sendMessage("§7/goal admin queue [world] next [id|position] - Activate next or selected goal");
     }
 
-    private boolean handleBorderInfo(CommandSender sender) {
+    private boolean handleBorderInfo(CommandSender sender, BorderExpansionManager borderManager) {
         BorderExpansionManager.BorderInfo info = borderManager.getInfo();
         sender.sendMessage("");
-        sender.sendMessage("§6§l=== World Border Info ===");
-        sender.sendMessage("§7World: §f" + info.worldName);
-        sender.sendMessage("§7Center: §f(" + info.centerX + ", " + info.centerZ + ")");
-        sender.sendMessage("§7Current Size: §f" + info.currentSize + " blocks");
-        sender.sendMessage("§7Expansion Amount: §f" + info.expansionAmount + " blocks");
+        sender.sendMessage("?6?l=== World Border Info ===");
+        sender.sendMessage("?7World: ?f" + info.worldName);
+        sender.sendMessage("?7Center: ?f(" + info.centerX + ", " + info.centerZ + ")");
+        sender.sendMessage("?7Current Size: ?f" + info.currentSize + " blocks");
+        sender.sendMessage("?7Expansion Amount: ?f" + info.expansionAmount + " blocks");
         sender.sendMessage("");
         return true;
     }
 
-    private boolean handleBorderSet(CommandSender sender, String[] args) {
-        if (args.length < 3) {
-            sendError(sender, "Usage: /goal admin border set <size>");
+    private boolean handleBorderSet(CommandSender sender, BorderExpansionManager borderManager, String[] args, int sizeIndex, String worldName) {
+        if (args.length <= sizeIndex) {
+            sendError(sender, "Usage: /goal admin border [world] set <size>");
             return true;
         }
 
         try {
-            double size = Double.parseDouble(args[2]);
+            double size = Double.parseDouble(args[sizeIndex]);
             if (borderManager.setSize(size)) {
                 sendSuccess(sender, "Border size set to " + size + " blocks");
-                saveBorderConfig();
+                saveBorderConfig(worldName);
             } else {
                 sendError(sender, "Failed to set border size");
             }
@@ -495,12 +590,12 @@ public class GoalAdminCommand extends BaseCommand {
         return true;
     }
 
-    private boolean handleBorderExpand(CommandSender sender, String[] args) {
+    private boolean handleBorderExpand(CommandSender sender, BorderExpansionManager borderManager, String[] args, int amountIndex, String worldName) {
         double amount = borderManager.getBorderConfig().getExpansionAmount();
-        
-        if (args.length >= 3) {
+
+        if (args.length > amountIndex) {
             try {
-                amount = Double.parseDouble(args[2]);
+                amount = Double.parseDouble(args[amountIndex]);
             } catch (NumberFormatException e) {
                 sendError(sender, "Amount must be a number");
                 return true;
@@ -509,26 +604,26 @@ public class GoalAdminCommand extends BaseCommand {
 
         if (borderManager.expandBorder(amount)) {
             sendSuccess(sender, "Border expanded by " + amount + " blocks");
-            saveBorderConfig();
+            saveBorderConfig(worldName);
         } else {
             sendError(sender, "Failed to expand border");
         }
         return true;
     }
 
-    private boolean handleBorderCenter(CommandSender sender, String[] args) {
-        if (args.length < 4) {
-            sendError(sender, "Usage: /goal admin border center <x> <z>");
+    private boolean handleBorderCenter(CommandSender sender, BorderExpansionManager borderManager, String[] args, int coordIndex, String worldName) {
+        if (args.length <= coordIndex + 1) {
+            sendError(sender, "Usage: /goal admin border [world] center <x> <z>");
             return true;
         }
 
         try {
-            double x = Double.parseDouble(args[2]);
-            double z = Double.parseDouble(args[3]);
-            
+            double x = Double.parseDouble(args[coordIndex]);
+            double z = Double.parseDouble(args[coordIndex + 1]);
+
             if (borderManager.setCenter(x, z)) {
                 sendSuccess(sender, "Border center set to (" + x + ", " + z + ")");
-                saveBorderConfig();
+                saveBorderConfig(worldName);
             } else {
                 sendError(sender, "Failed to set border center");
             }
@@ -541,7 +636,7 @@ public class GoalAdminCommand extends BaseCommand {
     private void showHelp(CommandSender sender) {
         sender.sendMessage("");
         sender.sendMessage("§6§l=== Goal Admin Commands ===");
-        sender.sendMessage("§7/goal admin create <id> <name> <target> [description]");
+        sender.sendMessage("§7/goal admin create <id> <name> <target> [reward] [world] [description]");
         sender.sendMessage("§7/goal admin delete <id>");
         sender.sendMessage("§7/goal admin info <id>");
         sender.sendMessage("§7/goal admin list");
@@ -550,8 +645,8 @@ public class GoalAdminCommand extends BaseCommand {
         sender.sendMessage("§7/goal admin setstate <id> <state>");
         sender.sendMessage("§7/goal admin setreward <id> <amount>");
         sender.sendMessage("§7/goal admin save");
-        sender.sendMessage("§7/goal admin border - Border management commands");
-        sender.sendMessage("§7/goal admin queue - Queue management commands");
+        sender.sendMessage("§7/goal admin border [world] - Border management commands");
+        sender.sendMessage("§7/goal admin queue [world] - Queue management commands");
         sender.sendMessage("");
     }
 
@@ -609,16 +704,42 @@ public class GoalAdminCommand extends BaseCommand {
         return result.toArray(new String[0]);
     }
 
+    private String resolveDefaultWorld(CommandSender sender) {
+        if (sender instanceof Player) {
+            String worldName = ((Player) sender).getWorld().getName();
+            BorderExpansionManager manager = borderRegistry.getManager(worldName);
+            if (manager != null) {
+                return manager.getBorderConfig().getWorldName();
+            }
+        }
+        return borderRegistry.getDefaultWorld();
+    }
+
+    private String resolveWorldName(String candidate) {
+        if (candidate == null || candidate.isBlank()) {
+            return null;
+        }
+        BorderExpansionManager manager = borderRegistry.getManager(candidate);
+        if (manager == null) {
+            return null;
+        }
+        return manager.getBorderConfig().getWorldName();
+    }
+
+    private boolean isBorderSubcommand(String value) {
+        return value.equals("info") || value.equals("set") || value.equals("expand") || value.equals("center");
+    }
+
+    private boolean isQueueAction(String value) {
+        return value.equals("list") || value.equals("add") || value.equals("remove") || value.equals("move") || value.equals("next");
+    }
+
     /**
      * Save current border configuration to config file
      */
-    private void saveBorderConfig() {
+    private void saveBorderConfig(String worldName) {
         try {
-            BorderExpansionManager.BorderInfo info = borderManager.getInfo();
-            configManager.set("world-border.center-x", info.centerX);
-            configManager.set("world-border.center-z", info.centerZ);
-            configManager.set("world-border.initial-size", info.currentSize);
-            configManager.saveConfig();
+            borderRegistry.saveBorderConfig(configManager, worldName);
         } catch (Exception e) {
             logger.warning("Failed to save border configuration: " + e.getMessage());
         }

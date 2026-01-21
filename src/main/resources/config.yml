@@ -20,22 +20,31 @@ goals:
   # Enable goal queue mode (only one active goal at a time)
   queue-enabled: false
 
-# World border configuration
+# World border configuration (multi-world)
+world-borders:
+  # Default world to use when creating goals
+  default-world: "world"
+  worlds:
+    world:
+      enabled: true
+      center-x: 0
+      center-z: 0
+      initial-size: 50
+      expansion-amount: 20
+    world_nether:
+      enabled: true
+      center-x: 0
+      center-z: 0
+      initial-size: 50
+      expansion-amount: 10
+
+# Legacy single-world configuration (used only if world-borders.worlds is not set)
 world-border:
-  # Enabled or disabled
   enabled: true
-  
-  # World name to apply border to
   world: "world"
-  
-  # Border center coordinates
   center-x: 0
   center-z: 0
-  
-  # Initial border size
   initial-size: 50
-  
-  # Amount to expand on goal completion (in blocks)
   expansion-amount: 20
 
 # Command permissions

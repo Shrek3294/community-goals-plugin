@@ -68,11 +68,21 @@ public class GoalPlayerCommand extends BaseCommand {
     }
 
     private boolean handleList(CommandSender sender) {
-        Collection<Goal> goals = tracker.getActiveGoals();
+        Collection<Goal> goals;
+        String worldName = null;
+        if (sender instanceof Player) {
+            worldName = ((Player) sender).getWorld().getName();
+            goals = tracker.getActiveGoalsForWorld(worldName);
+        } else {
+            goals = tracker.getActiveGoals();
+        }
 
         sender.sendMessage("");
         sender.sendMessage("§6§l=== Active Community Goals ===");
         sender.sendMessage("§7Total: " + goals.size());
+        if (worldName != null) {
+            sender.sendMessage("§7World: §f" + worldName);
+        }
         sender.sendMessage("");
 
         for (Goal goal : goals) {
@@ -289,6 +299,12 @@ public class GoalPlayerCommand extends BaseCommand {
         if (id.contains("chicken")) return "CHICKEN";
         if (id.contains("fish")) return "COD";
         if (id.contains("netherite")) return "NETHERITE_INGOT";
+        if (id.contains("blaze")) return "BLAZE_ROD";
+        if (id.contains("wart")) return "NETHER_WART";
+        if (id.contains("ghast")) return "GHAST_TEAR";
+        if (id.contains("ancient") || id.contains("debris")) return "ANCIENT_DEBRIS";
+        if (id.contains("quartz")) return "NETHER_QUARTZ";
+        if (id.contains("magma")) return "MAGMA_CREAM";
         
         return null; // Couldn't guess
     }
@@ -297,6 +313,7 @@ public class GoalPlayerCommand extends BaseCommand {
         sender.sendMessage("");
         sender.sendMessage("§6§l=== " + goal.getName() + " ===");
         sender.sendMessage("§7Description: " + goal.getDescription());
+        sender.sendMessage("§7World: §f" + goal.getWorldName());
         sender.sendMessage("§7Progress: " + goal.getCurrentProgress() + " / " + goal.getTargetProgress());
         sender.sendMessage(String.format("§7Completion: §a%.1f%%", goal.getProgressPercentage()));
         if (goal.getRewardExpansion() > 0) {

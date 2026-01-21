@@ -24,18 +24,20 @@ import java.util.*;
 public class FancyNpcManager {
     private static final String STORAGE_FILE = "npcs.yml";
     private static final String CENTRAL_NPC_KEY = "central";
+    private static final String CENTRAL_NPCS_KEY = "central-npcs";
 
     private final JavaPlugin plugin;
     private final Path storagePath;
     private final Yaml yaml;
     private final Map<String, StoredNpc> npcByName;
-    private StoredNpc centralNpc;
+    private final Map<String, StoredNpc> centralNpcs;
 
     public FancyNpcManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.storagePath = plugin.getDataFolder().toPath().resolve(STORAGE_FILE);
         this.yaml = new Yaml();
         this.npcByName = new HashMap<>();
+        this.centralNpcs = new HashMap<>();
         loadNPCs();
     }
 
@@ -83,9 +85,27 @@ public class FancyNpcManager {
         if (location == null) {
             throw new IllegalArgumentException("NPC location is required");
         }
+        if (location.getWorld() == null) {
+            throw new IllegalArgumentException("NPC world is required");
+        }
 
-        if (centralNpc != null) {
-            deleteCentralNpc();
+        setCentralNpc(location.getWorld().getName(), npcName, location);
+    }
+
+    public void setCentralNpc(String worldName, String npcName, Location location) {
+        if (!canCreateNPCs()) {
+            throw new IllegalStateException("FancyNpcs plugin is not available");
+        }
+        if (location == null) {
+            throw new IllegalArgumentException("NPC location is required");
+        }
+        if (location.getWorld() == null) {
+            throw new IllegalArgumentException("NPC world is required");
+        }
+
+        String worldKey = normalizeWorldName(worldName);
+        if (centralNpcs.containsKey(worldKey)) {
+            deleteCentralNpc(worldName);
         }
 
         NpcManager npcManager = getNpcManager();
@@ -103,16 +123,17 @@ public class FancyNpcManager {
         npc.create();
         npc.spawnForAll();
 
-        centralNpc = new StoredNpc(npcName, CENTRAL_NPC_KEY, location);
+        centralNpcs.put(worldKey, new StoredNpc(npcName, CENTRAL_NPC_KEY, location));
         saveNPCs();
     }
 
-    public boolean deleteCentralNpc() {
-        if (centralNpc == null) {
+    public boolean deleteCentralNpc(String worldName) {
+        String worldKey = normalizeWorldName(worldName);
+        StoredNpc stored = centralNpcs.remove(worldKey);
+        if (stored == null) {
             return false;
         }
-        String npcName = centralNpc.name;
-        centralNpc = null;
+        String npcName = stored.name;
 
         NpcManager npcManager = getNpcManager();
         if (npcManager != null) {
@@ -241,14 +262,33 @@ public class FancyNpcManager {
     }
 
     public boolean isCentralNpc(String npcName) {
-        if (centralNpc == null) {
-            return false;
-        }
-        return normalizeName(centralNpc.name).equals(normalizeName(npcName));
+        return getCentralWorldForNpc(npcName) != null;
     }
 
-    public String getCentralNpcName() {
-        return centralNpc == null ? null : centralNpc.name;
+    public String getCentralNpcName(String worldName) {
+        StoredNpc stored = centralNpcs.get(normalizeWorldName(worldName));
+        return stored == null ? null : stored.name;
+    }
+
+    public Map<String, String> getCentralNpcNames() {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map.Entry<String, StoredNpc> entry : centralNpcs.entrySet()) {
+            if (entry.getValue() != null) {
+                result.put(entry.getKey(), entry.getValue().name);
+            }
+        }
+        return result;
+    }
+
+    public String getCentralWorldForNpc(String npcName) {
+        String key = normalizeName(npcName);
+        for (Map.Entry<String, StoredNpc> entry : centralNpcs.entrySet()) {
+            StoredNpc stored = entry.getValue();
+            if (stored != null && normalizeName(stored.name).equals(key)) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 
     /**
@@ -290,16 +330,24 @@ public class FancyNpcManager {
 
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("npcs", npcList);
-        if (centralNpc != null && centralNpc.location != null && centralNpc.location.getWorld() != null) {
+        Map<String, Object> centralMap = new LinkedHashMap<>();
+        for (Map.Entry<String, StoredNpc> entry : centralNpcs.entrySet()) {
+            StoredNpc stored = entry.getValue();
+            if (stored == null || stored.location == null || stored.location.getWorld() == null) {
+                continue;
+            }
             Map<String, Object> central = new LinkedHashMap<>();
-            central.put("name", centralNpc.name);
-            central.put("world", centralNpc.location.getWorld().getName());
-            central.put("x", centralNpc.location.getX());
-            central.put("y", centralNpc.location.getY());
-            central.put("z", centralNpc.location.getZ());
-            central.put("yaw", centralNpc.location.getYaw());
-            central.put("pitch", centralNpc.location.getPitch());
-            root.put(CENTRAL_NPC_KEY, central);
+            central.put("name", stored.name);
+            central.put("world", stored.location.getWorld().getName());
+            central.put("x", stored.location.getX());
+            central.put("y", stored.location.getY());
+            central.put("z", stored.location.getZ());
+            central.put("yaw", stored.location.getYaw());
+            central.put("pitch", stored.location.getPitch());
+            centralMap.put(entry.getKey(), central);
+        }
+        if (!centralMap.isEmpty()) {
+            root.put(CENTRAL_NPCS_KEY, centralMap);
         }
 
         try (FileWriter writer = new FileWriter(storagePath.toFile())) {
@@ -319,7 +367,7 @@ public class FancyNpcManager {
      */
     public void reloadNPCs() {
         npcByName.clear();
-        centralNpc = null;
+        centralNpcs.clear();
         loadNPCs();
 
         NpcManager npcManager = getNpcManager();
@@ -359,6 +407,28 @@ public class FancyNpcManager {
                 npcByName.put(normalizeName(name), new StoredNpc(name, goalId, location));
             }
 
+            Object centralMultiRaw = data.get(CENTRAL_NPCS_KEY);
+            if (centralMultiRaw instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> centralMap = (Map<String, Object>) centralMultiRaw;
+                for (Map.Entry<String, Object> entry : centralMap.entrySet()) {
+                    if (!(entry.getValue() instanceof Map)) {
+                        continue;
+                    }
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> centralEntry = (Map<String, Object>) entry.getValue();
+                    String name = asString(centralEntry.get("name"));
+                    if (name == null) {
+                        continue;
+                    }
+                    Location location = toLocation(centralEntry);
+                    if (location == null || location.getWorld() == null) {
+                        continue;
+                    }
+                    centralNpcs.put(normalizeWorldName(location.getWorld().getName()), new StoredNpc(name, CENTRAL_NPC_KEY, location));
+                }
+            }
+
             Object centralRaw = data.get(CENTRAL_NPC_KEY);
             if (centralRaw instanceof Map) {
                 @SuppressWarnings("unchecked")
@@ -366,7 +436,9 @@ public class FancyNpcManager {
                 String name = asString(centralEntry.get("name"));
                 if (name != null) {
                     Location location = toLocation(centralEntry);
-                    centralNpc = new StoredNpc(name, CENTRAL_NPC_KEY, location);
+                    if (location != null && location.getWorld() != null) {
+                        centralNpcs.put(normalizeWorldName(location.getWorld().getName()), new StoredNpc(name, CENTRAL_NPC_KEY, location));
+                    }
                 }
             }
         } catch (IOException e) {
@@ -401,9 +473,15 @@ public class FancyNpcManager {
             npc.spawnForAll();
         }
 
-        if (centralNpc != null && centralNpc.location != null && npcManager.getNpc(centralNpc.name) == null) {
-            NpcData data = createNpcData(centralNpc.name, CENTRAL_NPC_KEY, centralNpc.location);
-            data.setDisplayName(centralNpc.name);
+        for (StoredNpc stored : centralNpcs.values()) {
+            if (stored == null || stored.location == null) {
+                continue;
+            }
+            if (npcManager.getNpc(stored.name) != null) {
+                continue;
+            }
+            NpcData data = createNpcData(stored.name, CENTRAL_NPC_KEY, stored.location);
+            data.setDisplayName(stored.name);
             data.setTurnToPlayer(true);
             Npc npc = createNpcFromData(data);
             npc.setSaveToFile(true);
@@ -438,6 +516,10 @@ public class FancyNpcManager {
             (goalId + ":" + npcName).getBytes(StandardCharsets.UTF_8)
         );
         return new NpcData(npcName, uuid, location);
+    }
+
+    private String normalizeWorldName(String worldName) {
+        return worldName == null ? "" : worldName.toLowerCase(Locale.ROOT);
     }
 
     private String normalizeName(String npcName) {

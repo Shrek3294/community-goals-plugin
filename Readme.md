@@ -17,6 +17,7 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 - **Seamless Integration**: Border expands automatically when goals are completed
 - **Smooth Animation**: 30-second expansion animation for dramatic effect
 - **Configurable Amounts**: Set custom expansion amounts per goal completion
+- **Multi-World Support**: Configure separate borders and rewards per world
 - **Persistent Settings**: Border settings are saved and restored on server restart
 - **Manual Control**: Admin commands for manual border management
 
@@ -33,6 +34,79 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 - **Data Management**: Manual save commands and configuration options
 
 ---
+
+---
+
+## Getting Started (Server Owners)
+
+Follow these steps to set up separate Overworld/Nether goals and borders.
+
+### 1) Install
+1. Drop the plugin JAR into `plugins/`.
+2. Start the server once to generate `plugins/CommunityGoals/config.yml`.
+3. Stop the server.
+
+### 2) Configure Borders per World
+Edit `plugins/CommunityGoals/config.yml`:
+
+```yaml
+world-borders:
+  default-world: "world"
+  worlds:
+    world:
+      enabled: true
+      center-x: 0
+      center-z: 0
+      initial-size: 1000
+      expansion-amount: 200
+    world_nether:
+      enabled: true
+      center-x: 0
+      center-z: 0
+      initial-size: 200
+      expansion-amount: 50
+```
+
+Notes:
+- World names must match exactly (e.g., `world`, `world_nether`).
+- `default-world` is used if you don?t specify a world when creating a goal.
+
+### 3) Create Goals per Dimension
+Overworld example:
+```
+/goal-admin create wood_collection "Lumber Drive" 5000 200 world "Collect 5000 wood logs"
+```
+
+Nether example:
+```
+/goal-admin create blaze_rods "Blaze Hunt" 250 100 world_nether "Collect 250 blaze rods"
+```
+
+### 4) Add NPCs for Each Dimension (Optional)
+Install FancyNpcs, then:
+```
+/goal-npc link OverworldGuide wood_collection
+/goal-npc link NetherGuide blaze_rods
+```
+
+### 5) Verify Borders
+```
+/goal-admin border world info
+/goal-admin border world_nether info
+```
+
+### 6) (Optional) Enable Queue Mode per World
+In config:
+```yaml
+goals:
+  queue-enabled: true
+```
+
+Manage per-world queues:
+```
+/goal-admin queue world list
+/goal-admin queue world_nether list
+```
 
 ## 📋 Commands Reference
 
@@ -51,7 +125,7 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 #### **Goal Management**
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/goal-admin create <id> <name> <target> [reward] [description]` | Create a new community goal | `/goal-admin create diamonds "Diamond Collection" 1000 200 "Collect 1000 diamonds to expand the border"` |
+| `/goal-admin create <id> <name> <target> [reward] [world] [description]` | Create a new community goal | `/goal-admin create diamonds "Diamond Collection" 1000 200 world "Collect 1000 diamonds to expand the border"` |
 | `/goal-admin delete <id>` | Permanently delete a goal | `/goal-admin delete diamonds` |
 | `/goal-admin info <id>` | View detailed goal information including creation date | `/goal-admin info diamonds` |
 | `/goal-admin list` | Display all goals with progress bars and completion status | `/goal-admin list` |
@@ -68,19 +142,19 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 | Command | Description | Example |
 |---------|-------------|---------|
 | `/goal-admin save` | Force save all goals to disk | `/goal-admin save` |
-| `/goal-admin queue list` | List queued goals and active goal | `/goal-admin queue list` |
-| `/goal-admin queue add <id>` | Add a goal to the queue | `/goal-admin queue add diamonds` |
-| `/goal-admin queue remove <id>` | Remove a goal from the queue | `/goal-admin queue remove diamonds` |
-| `/goal-admin queue move <id> <pos>` | Move a goal in the queue | `/goal-admin queue move diamonds 2` |
-| `/goal-admin queue next` | Activate the next queued goal | `/goal-admin queue next` |
+| `/goal-admin queue [world] list` | List queued goals and active goal | `/goal-admin queue world list` |
+| `/goal-admin queue [world] add <id>` | Add a goal to the queue | `/goal-admin queue world add diamonds` |
+| `/goal-admin queue [world] remove <id>` | Remove a goal from the queue | `/goal-admin queue world remove diamonds` |
+| `/goal-admin queue [world] move <id> <pos>` | Move a goal in the queue | `/goal-admin queue world move diamonds 2` |
+| `/goal-admin queue [world] next` | Activate the next queued goal | `/goal-admin queue world next` |
 
 #### **World Border Management**
 | Command | Description | Example |
 |---------|-------------|---------|
-| `/goal-admin border info` | Display current border size, center, and expansion settings | `/goal-admin border info` |
-| `/goal-admin border set <size>` | Set border to specific size in blocks | `/goal-admin border set 1000` |
-| `/goal-admin border expand [amount]` | Expand border by amount (uses config default if omitted) | `/goal-admin border expand 200` |
-| `/goal-admin border center <x> <z>` | Move border center to coordinates | `/goal-admin border center 0 0` |
+| `/goal-admin border [world] info` | Display current border size, center, and expansion settings | `/goal-admin border world info` |
+| `/goal-admin border [world] set <size>` | Set border to specific size in blocks | `/goal-admin border world set 1000` |
+| `/goal-admin border [world] expand [amount]` | Expand border by amount (uses config default if omitted) | `/goal-admin border world expand 200` |
+| `/goal-admin border [world] center <x> <z>` | Move border center to coordinates | `/goal-admin border world center 0 0` |
 
 ---
 
@@ -91,14 +165,22 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 The plugin automatically generates a configuration file on first startup. Here are the key settings:
 
 ```yaml
-# World border configuration
-world-border:
-  enabled: true                     # Enable/disable automatic border expansion
-  world: "world"                    # World name to manage (usually "world")
-  center-x: 0                       # Border center X coordinate
-  center-z: 0                       # Border center Z coordinate  
-  initial-size: 50                  # Starting border size in blocks
-  expansion-amount: 100             # Blocks to expand when goals complete
+# World border configuration (multi-world)
+world-borders:
+  default-world: "world"            # Default world for new goals
+  worlds:
+    world:
+      enabled: true                 # Enable/disable automatic border expansion
+      center-x: 0                   # Border center X coordinate
+      center-z: 0                   # Border center Z coordinate  
+      initial-size: 50              # Starting border size in blocks
+      expansion-amount: 100         # Blocks to expand when goals complete
+    world_nether:
+      enabled: true
+      center-x: 0
+      center-z: 0
+      initial-size: 50
+      expansion-amount: 50
 
 # Goals system
 goals:
@@ -114,7 +196,8 @@ persistence:
 
 ### 🔧 **Important Configuration Notes**
 
-- **World Name**: Make sure `world-border.world` matches your main world name exactly
+- **World Names**: Ensure each entry under `world-borders.worlds` matches your world names exactly
+- **Default World**: Set `world-borders.default-world` to the world you want new goals to use by default
 - **Initial Size**: Set `initial-size` to your current border size to avoid resets
 - **Expansion Amount**: Adjust `expansion-amount` based on your server's progression pace
 - **Per-Goal Rewards**: Use `/goal-admin setreward` or the create reward field to override the default expansion
@@ -131,22 +214,30 @@ persistence:
 4. The plugin will create default configuration files
 
 ### **Step 2: Configure Your World Border**
-1. Check your current border size: `/goal-admin border info`
+1. Check your current border size: `/goal-admin border <world> info`
 2. Update the config file with your current settings:
    ```yaml
-   world-border:
-     world: "world"              # Your world name
-     center-x: 0                 # Current center X
-     center-z: 0                 # Current center Z
-     initial-size: 1000          # Current border size
-     expansion-amount: 200       # How much to expand per goal
+   world-borders:
+     default-world: "world"
+     worlds:
+       world:
+         center-x: 0             # Current center X
+         center-z: 0             # Current center Z
+         initial-size: 1000      # Current border size
+         expansion-amount: 200   # How much to expand per goal
+       world_nether:
+         center-x: 0
+         center-z: 0
+         initial-size: 200
+         expansion-amount: 50
    ```
 3. Restart the server to apply changes
 
 ### **Step 3: Create Your First Goal**
 ```bash
-/goal-admin create wood_collection "Lumber Drive" 5000 "Collect 5000 wood logs to expand our territory!"
+/goal-admin create wood_collection "Lumber Drive" 5000 world "Collect 5000 wood logs to expand our territory!"
 ```
+Add a world name (e.g., `world_nether`) to create Nether-specific goals.
 
 ### **Step 4: Test the System**
 ```bash
@@ -175,7 +266,7 @@ Example:
 
 The NPC will spawn at your location. When players right-click it, they will see the goal info.
 
-To set the **central goals NPC** that opens the goals GUI:
+To set the **central goals NPC** for a world (opens that world's goals GUI):
 ```bash
 /goal-npc central set <npc_name>
 ```
@@ -191,7 +282,7 @@ Other useful commands:
 ```bash
 /goal-npc list
 /goal-npc unlink <npc_name>
-/goal-npc central remove
+/goal-npc central remove [world]
 ```
 
 ---
@@ -267,6 +358,7 @@ goals:
     id: "diamonds"
     name: "Diamond Collection"
     description: "Collect diamonds for the community"
+    world: "world"
     currentProgress: 750
     targetProgress: 1000
     state: "ACTIVE"
@@ -287,8 +379,8 @@ goals:
 #### **Border Not Expanding**
 - **Cause**: World name mismatch or border at maximum size
 - **Solutions**: 
-  - Check `/goal-admin border info` for current settings
-  - Verify `world-border.world` in config matches your world name exactly
+  - Check `/goal-admin border <world> info` for current settings
+  - Verify `world-borders.worlds` entries in config match your world names exactly
   - Ensure border isn't at Minecraft's maximum size (30,000,000 blocks)
 
 #### **Goals Not Saving**

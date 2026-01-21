@@ -30,6 +30,7 @@ public class NPCInteractionHandler implements Listener {
         player.sendMessage("");
         player.sendMessage("§6§l=== " + goal.getName() + " ===");
         player.sendMessage("§7Description: " + goal.getDescription());
+        player.sendMessage("§7World: §f" + goal.getWorldName());
         player.sendMessage("§7Progress: " + goal.getCurrentProgress() + " / " + goal.getTargetProgress());
         player.sendMessage(String.format("§7Completion: §a%.1f%%", goal.getProgressPercentage()));
         if (goal.getRewardExpansion() > 0) {
@@ -69,8 +70,9 @@ public class NPCInteractionHandler implements Listener {
         }
 
         String npcName = npc.getData().getName();
-        if (npcManager.isCentralNpc(npcName)) {
-            guiManager.openGoalsMenu(event.getPlayer());
+        String centralWorld = npcManager.getCentralWorldForNpc(npcName);
+        if (centralWorld != null) {
+            guiManager.openGoalsMenu(event.getPlayer(), centralWorld);
             event.setCancelled(true);
             return;
         }
