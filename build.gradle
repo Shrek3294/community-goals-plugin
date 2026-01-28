@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'com.community'
-version = '1.0-SNAPSHOT'
+version = '1.5'
 
 repositories {
     mavenCentral()
@@ -19,11 +19,16 @@ repositories {
         name = "fancy-npc-repo"
         url = "https://repo.fancyplugins.de/releases"
     }
+    maven {
+        name = "placeholderapi"
+        url = "https://repo.extendedclip.com/content/repositories/placeholderapi/"
+    }
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT'
+    compileOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT'
     compileOnly files('server/plugins/FancyNpcs-2.9.1.jar')
+    compileOnly 'me.clip:placeholderapi:2.11.6'
     
     // YAML processing
     implementation 'org.yaml:snakeyaml:2.0'

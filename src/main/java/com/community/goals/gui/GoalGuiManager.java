@@ -3,6 +3,7 @@ package com.community.goals.gui;
 import com.community.goals.Goal;
 import com.community.goals.State;
 import com.community.goals.logic.GoalProgressTracker;
+import com.community.goals.logic.GoalQueueManager;
 import com.community.goals.logic.TurnInHandler;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -29,11 +30,13 @@ public class GoalGuiManager implements Listener {
 
     private final GoalProgressTracker tracker;
     private final TurnInHandler turnInHandler;
+    private final GoalQueueManager queueManager;
     private final Map<UUID, GoalsMenuHolder> openGoalsMenus;
 
-    public GoalGuiManager(GoalProgressTracker tracker, TurnInHandler turnInHandler) {
+    public GoalGuiManager(GoalProgressTracker tracker, TurnInHandler turnInHandler, GoalQueueManager queueManager) {
         this.tracker = tracker;
         this.turnInHandler = turnInHandler;
+        this.queueManager = queueManager;
         this.openGoalsMenus = new HashMap<>();
     }
 
@@ -314,7 +317,7 @@ public class GoalGuiManager implements Listener {
         if (id.contains("wart")) return Material.NETHER_WART;
         if (id.contains("ghast")) return Material.GHAST_TEAR;
         if (id.contains("ancient") || id.contains("debris")) return Material.ANCIENT_DEBRIS;
-        if (id.contains("quartz")) return Material.NETHER_QUARTZ;
+        if (id.contains("quartz")) return Material.QUARTZ;
         if (id.contains("magma")) return Material.MAGMA_CREAM;
 
         return null;
@@ -323,14 +326,35 @@ public class GoalGuiManager implements Listener {
     private List<Goal> getDisplayGoals(String worldName) {
         List<Goal> all = new ArrayList<>(tracker.getGoalsForWorld(worldName));
         all.removeIf(goal -> goal.getState() == State.COMPLETED);
-        all.sort(Comparator
-            .comparing((Goal goal) -> goal.getState() != State.ACTIVE)
-            .thenComparing(Goal::getName, String.CASE_INSENSITIVE_ORDER));
 
-        if (all.size() > GOAL_SLOTS.length) {
-            return all.subList(0, GOAL_SLOTS.length);
+        Map<String, Goal> goalsById = new HashMap<>();
+        for (Goal goal : all) {
+            goalsById.put(goal.getId().toLowerCase(Locale.ROOT), goal);
         }
-        return all;
+
+        List<Goal> ordered = new ArrayList<>();
+        if (queueManager != null && queueManager.isEnabled()) {
+            List<String> queue = queueManager.getQueue(worldName);
+            if (!queue.isEmpty()) {
+                for (String goalId : queue) {
+                    Goal goal = goalsById.remove(goalId.toLowerCase(Locale.ROOT));
+                    if (goal != null) {
+                        ordered.add(goal);
+                    }
+                }
+            }
+        }
+
+        if (!goalsById.isEmpty()) {
+            List<Goal> remaining = new ArrayList<>(goalsById.values());
+            remaining.sort(Comparator.comparingLong(Goal::getCreatedAt));
+            ordered.addAll(remaining);
+        }
+
+        if (ordered.size() > GOAL_SLOTS.length) {
+            return ordered.subList(0, GOAL_SLOTS.length);
+        }
+        return ordered;
     }
 
     private ItemStack buildGoalItem(Goal goal, boolean locked) {

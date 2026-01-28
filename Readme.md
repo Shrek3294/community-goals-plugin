@@ -33,6 +33,19 @@ A comprehensive Paper/Spigot plugin that brings your server community together t
 - **Border Control**: Full control over world border size, center, and expansion settings
 - **Data Management**: Manual save commands and configuration options
 
+## Catalyst Content (Optional)
+
+- Catalyst ore is mapped to the deepslate copper ore block and textured via the resource pack.
+- Datapack (in `terra_world/datapacks/catalyst`) adds named/lore drops and smelt/blast recipes for Catalyst Ingots.
+- Catalyst Ingot uses `IRON_INGOT` with custom model data `1001`.
+- Catalyst Pickaxe uses `DIAMOND_PICKAXE` with custom model data `1002`.
+- Recipe: `CCC / S / E` (C = Catalyst Ingot, S = stick, E = echo shard).
+- Plugin enforces Catalyst-only turn-ins for catalyst goals and blocks the vanilla iron pickaxe result if Catalyst Ingots are in the grid.
+
+Notes:
+- On 1.21.10, `/give minecraft:deepslate_copper_ore` will not apply item components. Use:
+  - `/loot give @p loot minecraft:blocks/deepslate_copper_ore`
+
 ---
 
 ---

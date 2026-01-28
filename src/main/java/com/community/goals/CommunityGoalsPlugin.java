@@ -3,6 +3,7 @@ package com.community.goals;
 import com.community.goals.commands.*;
 import com.community.goals.features.BorderExpansionManager;
 import com.community.goals.features.BorderManagerRegistry;
+import com.community.goals.features.HelpBookManager;
 import com.community.goals.features.ProgressAnnouncementManager;
 import com.community.goals.gui.GoalGuiManager;
 import com.community.goals.logic.GoalProgressTracker;
@@ -10,6 +11,8 @@ import com.community.goals.logic.GoalQueueManager;
 import com.community.goals.logic.TurnInHandler;
 import com.community.goals.npc.FancyNpcManager;
 import com.community.goals.npc.NPCInteractionHandler;
+import com.community.goals.placeholders.GoalExpansion;
+import com.community.goals.placeholders.WorldBorderExpansion;
 import com.community.goals.persistence.ConfigManager;
 import com.community.goals.persistence.PersistenceManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -31,6 +34,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
     private TurnInHandler turnInHandler;
     private GoalGuiManager goalGuiManager;
     private GoalQueueManager goalQueueManager;
+    private HelpBookManager helpBookManager;
 
     @Override
     public void onEnable() {
@@ -57,9 +61,9 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             // Initialize core logic
             goalProgressTracker = new GoalProgressTracker(persistenceManager);
             turnInHandler = new TurnInHandler(goalProgressTracker);
-            goalGuiManager = new GoalGuiManager(goalProgressTracker, turnInHandler);
             boolean queueEnabled = configManager.getBoolean("goals.queue-enabled", false);
             goalQueueManager = new GoalQueueManager(goalProgressTracker, persistenceManager, queueEnabled, borderRegistry.getDefaultWorld());
+            goalGuiManager = new GoalGuiManager(goalProgressTracker, turnInHandler, goalQueueManager);
             
             // Register goal completion listener for border expansion and announcements
             goalProgressTracker.addListener(new GoalCompletionHandler());
@@ -70,6 +74,7 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             // Initialize NPC system
             npcManager = new FancyNpcManager(this);
             npcInteractionHandler = new NPCInteractionHandler(npcManager, goalProgressTracker, goalGuiManager);
+            helpBookManager = new HelpBookManager(this);
 
             // Register commands
             registerCommands();
@@ -77,6 +82,9 @@ public class CommunityGoalsPlugin extends JavaPlugin {
             // Register event listeners
             getServer().getPluginManager().registerEvents(npcInteractionHandler, this);
             getServer().getPluginManager().registerEvents(goalGuiManager, this);
+            getServer().getPluginManager().registerEvents(helpBookManager, this);
+
+            registerPlaceholders();
 
             getLogger().info("Community Goals plugin enabled successfully!");
         } catch (Exception e) {
@@ -119,7 +127,20 @@ public class CommunityGoalsPlugin extends JavaPlugin {
         NPCCommand npcCommand = new NPCCommand(goalProgressTracker, persistenceManager, npcManager);
         getCommand("goal-npc").setExecutor(npcCommand);
 
+        getCommand("goalbook").setExecutor(helpBookManager);
+
         getLogger().info("Commands registered successfully!");
+    }
+
+    private void registerPlaceholders() {
+        if (!getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            getLogger().info("PlaceholderAPI not found; skipping placeholder registration.");
+            return;
+        }
+
+        new GoalExpansion(this, goalProgressTracker, goalQueueManager, borderRegistry).register();
+        new WorldBorderExpansion(this, borderRegistry).register();
+        getLogger().info("Registered PlaceholderAPI expansions: goal, worldborder.");
     }
 
     /**

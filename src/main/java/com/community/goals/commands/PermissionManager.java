@@ -11,6 +11,7 @@ public class PermissionManager {
     public static final String GOAL_EDIT = "goal.edit";
     public static final String GOAL_VIEW = "goal.view";
     public static final String BORDER_ADMIN = "goal.border.admin";
+    public static final String GOALBOOK_USE = "goalbook.use";
 
     /**
      * Check if permission string is valid
@@ -38,6 +39,8 @@ public class PermissionManager {
                 return "View goal information";
             case BORDER_ADMIN:
                 return "Manage world border";
+            case GOALBOOK_USE:
+                return "Get the community help book";
             default:
                 return "Unknown permission";
         }

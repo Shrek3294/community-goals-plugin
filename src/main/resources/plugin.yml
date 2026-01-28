@@ -7,6 +7,7 @@ authors:
   - Community
 softdepend:
   - FancyNpcs
+  - PlaceholderAPI
 
 commands:
   goal:
@@ -24,6 +25,11 @@ commands:
     usage: /goal-npc <subcommand>
     permission: goal.admin
 
+  goalbook:
+    description: Get the Community Goals help book
+    usage: /goalbook
+    permission: goalbook.use
+
 permissions:
   goal.use:
     description: Allows using goal commands
@@ -33,4 +39,7 @@ permissions:
     default: op
   goal.view:
     description: Allows viewing goal progress
+    default: true
+  goalbook.use:
+    description: Allows getting the Community Goals help book
     default: true
